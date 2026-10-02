@@ -914,9 +914,8 @@
 
     function renderHostQrCode() {
       // Craft the canonical pairing URL embedding the room token in the hash
-      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://qrdrop.mesh';
-      const pathname = window.location.pathname || '/';
-      const shareUrl = `${origin}${pathname}#room=${appState.roomToken}`;
+      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('#')[0].split('?')[0];
+      const shareUrl = `${origin}#room=${appState.roomToken}`;
 
       document.getElementById('hostShareUrlInput').value = shareUrl;
 
@@ -1128,16 +1127,25 @@
         appState.roomToken = parsedRoom.toUpperCase();
         window.location.hash = `room=${appState.roomToken}`;
         
-        // Re-bind dual sync channel to target room
+        // Re-bind dual sync channel & WebRTC peer to target room
         setupDualChannelSync();
         renderHostQrCode();
         closeCameraScanner();
 
-        showToast(`Joined Room ${appState.roomToken}! Initiating handshake...`);
+        // Connect as guest to host peer
+        const hostPeerId = `qrdrop-host-${appState.roomToken.toLowerCase()}`;
+        initializeWebRtcPeer(true);
+        connectToHostPeer(hostPeerId);
 
-        // Send active handshake announcement
+        // Show waiting banner on this guest device
+        document.getElementById('guestWaitingApprovalModal').classList.remove('hidden');
+        lucide.createIcons();
+
+        showToast(`QR Scanned! Sent pairing request to Host (${appState.roomToken})`);
+
+        // Broadcast pair request across local channel as well
         broadcastSignal({
-          type: 'PEER_SYN',
+          type: 'PAIR_REQUEST',
           sender: appState.localDevice,
           roomToken: appState.roomToken,
           timestamp: Date.now()
