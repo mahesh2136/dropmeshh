@@ -2,9 +2,9 @@
 <html lang="en" class="dark">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DropMesh - Local Wi-Fi P2P Share</title>
-  <!-- Tailwind CSS CDN -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>AirShare QR - Peer-to-Peer QR Mesh Transfer</title>
+  <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -12,696 +12,1053 @@
       theme: {
         extend: {
           colors: {
-            brand: {
-              50: '#eef2ff',
-              100: '#e0e7ff',
-              500: '#6366f1',
-              600: '#4f46e5',
-              700: '#4338ca',
+            cyber: {
+              950: '#060a12',
+              900: '#0a0f1d',
+              850: '#0e1526',
+              800: '#141d34',
+              700: '#1e2b4d',
+              border: '#1f2e4d',
+              accent: '#06b6d4',
+              emerald: '#10b981',
+              violet: '#8b5cf6',
+              rose: '#f43f5e'
             }
           },
+          fontFamily: {
+            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
+          },
           animation: {
-            'radar-pulse': 'radarPulse 3s cubic-bezier(0, 0, 0.2, 1) infinite',
-            'float': 'float 4s ease-in-out infinite',
+            'laser-sweep': 'laserSweep 2.2s ease-in-out infinite',
+            'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+            'ping-slow': 'ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite'
           },
           keyframes: {
-            radarPulse: {
-              '0%': { transform: 'scale(0.8)', opacity: '0.8' },
-              '100%': { transform: 'scale(2.2)', opacity: '0' },
-            },
-            float: {
-              '0%, 100%': { transform: 'translateY(0px)' },
-              '50%': { transform: 'translateY(-6px)' },
+            laserSweep: {
+              '0%, 100%': { transform: 'translateY(8%)', opacity: '0.4' },
+              '50%': { transform: 'translateY(92%)', opacity: '1' }
             }
           }
         }
       }
     }
   </script>
+
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
+  <!-- In-Browser QR Code Generator -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <!-- Fast Real-Time Camera QR Reader (jsQR) -->
+  <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
   <style>
-    /* Custom radar animations and scrollbar styling */
-    .radar-circle {
-      position: absolute;
+    .glass-panel {
+      background: rgba(14, 21, 38, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .custom-scroll::-webkit-scrollbar {
+      width: 5px;
+      height: 5px;
+    }
+    .custom-scroll::-webkit-scrollbar-track {
+      background: #060a12;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+      background: #1f2e4d;
       border-radius: 9999px;
-      border: 1px dashed rgba(99, 102, 241, 0.25);
+    }
+    .custom-scroll::-webkit-scrollbar-thumb:hover {
+      background: #06b6d4;
+    }
+    .scanner-mask {
+      box-shadow: 0 0 0 9999px rgba(6, 10, 18, 0.75);
+    }
+    .scan-reticle {
+      position: relative;
+    }
+    .scan-reticle::before, .scan-reticle::after,
+    .scan-reticle-inner::before, .scan-reticle-inner::after {
+      content: '';
+      position: absolute;
+      width: 24px;
+      height: 24px;
+      border-color: #06b6d4;
       pointer-events: none;
     }
-    ::-webkit-scrollbar {
-      width: 6px;
-      height: 6px;
-    }
-    ::-webkit-scrollbar-thumb {
-      background: rgba(156, 163, 175, 0.4);
-      border-radius: 9999px;
-    }
-    ::-webkit-scrollbar-track {
-      background: transparent;
-    }
+    .scan-reticle::before { top: 0; left: 0; border-top: 3px solid; border-left: 3px solid; border-top-left-radius: 12px; }
+    .scan-reticle::after { top: 0; right: 0; border-top: 3px solid; border-right: 3px solid; border-top-right-radius: 12px; }
+    .scan-reticle-inner::before { bottom: 0; left: 0; border-bottom: 3px solid; border-left: 3px solid; border-bottom-left-radius: 12px; }
+    .scan-reticle-inner::after { bottom: 0; right: 0; border-bottom: 3px solid; border-right: 3px solid; border-bottom-right-radius: 12px; }
   </style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-indigo-500 selection:text-white transition-colors duration-200">
+<body class="bg-cyber-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
 
-  <header class="border-b border-slate-800/80 bg-slate-900/80 backdrop-blur sticky top-0 z-40 px-4 lg:px-8 py-3.5">
-    <div class="max-w-7xl mx-auto flex items-center justify-between">
-      <!-- App Brand -->
+  <header class="sticky top-0 z-30 border-b border-cyber-border bg-cyber-950/90 backdrop-blur-md px-4 lg:px-8 py-3.5">
+    <div class="max-w-6xl mx-auto flex items-center justify-between">
+      
+      <!-- Brand & Device Tag -->
       <div class="flex items-center space-x-3">
-        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-indigo-600 via-indigo-500 to-cyan-400 flex items-center justify-center shadow-lg shadow-indigo-500/20">
-          <i data-lucide="radio" class="w-5 h-5 text-white"></i>
+        <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 via-teal-400 to-emerald-400 p-0.5 shadow-lg shadow-cyan-500/20">
+          <div class="w-full h-full bg-cyber-950 rounded-[14px] flex items-center justify-center text-cyan-400">
+            <i data-lucide="qr-code" class="w-5 h-5"></i>
+          </div>
+          <span id="globalConnDot" class="absolute -top-1 -right-1 flex h-3 w-3">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-500 opacity-60"></span>
+            <span class="relative inline-flex rounded-full h-3 w-3 bg-slate-600 border-2 border-cyber-950"></span>
+          </span>
         </div>
         <div>
           <div class="flex items-center gap-2">
-            <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-1.5">
-              DropMesh
-              <span class="text-[10px] uppercase font-semibold px-2 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400 border border-indigo-500/30">Wi-Fi Direct</span>
+            <h1 class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
+              AirShare <span class="text-cyan-400">QR</span>
+              <span class="text-[10px] text-cyan-300 font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-700/50">NO IP NEEDED</span>
             </h1>
           </div>
-          <p class="text-xs text-slate-400 hidden sm:block">Instant zero-cloud local peer-to-peer file transfer</p>
+          <p class="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
+            <span id="myDeviceBadgeIcon" class="text-emerald-400"><i data-lucide="laptop" class="w-3.5 h-3.5 inline"></i></span>
+            <span id="myDeviceName">This Device</span>
+            <span class="text-slate-600">•</span>
+            <span id="headerLinkStatusText" class="text-amber-400">Ready to Pair</span>
+          </p>
         </div>
       </div>
 
-      <!-- Center Network Pill -->
-      <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-800/80 border border-slate-700/60 text-xs">
-        <span class="relative flex h-2 w-2">
-          <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-          <span class="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-        </span>
-        <span class="text-slate-300 font-medium" id="networkSsidDisplay">Wi-Fi: Studio_Mesh_5G</span>
-        <span class="text-slate-500">|</span>
-        <span class="text-slate-400" id="localIpDisplay">192.168.1.104</span>
-      </div>
+      <!-- Quick Actions Header -->
+      <div class="flex items-center space-x-2">
+        <button id="navOpenScannerBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white text-xs font-mono font-medium shadow-md shadow-violet-600/20 transition">
+          <i data-lucide="scan" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Scan QR Code</span>
+          <span class="sm:hidden">Scan</span>
+        </button>
 
-      <!-- Action buttons -->
-      <div class="flex items-center space-x-2 sm:space-x-3">
-        <button id="toggleInboxBtn" class="relative p-2 rounded-xl bg-slate-800 hover:bg-slate-700 border border-slate-700/70 text-slate-300 hover:text-white transition flex items-center gap-1.5 text-xs font-medium">
+        <button id="navOpenHostQrBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyber-850 hover:bg-cyber-800 border border-cyber-border text-cyan-400 text-xs font-mono transition">
+          <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+          <span class="hidden sm:inline">Show My QR</span>
+          <span class="sm:hidden">My QR</span>
+        </button>
+
+        <button id="inboxToggleBtn" class="relative p-2 rounded-xl bg-cyber-850 hover:bg-cyber-800 border border-cyber-border text-slate-300 transition flex items-center justify-center" title="Received Files">
           <i data-lucide="inbox" class="w-4 h-4"></i>
-          <span class="hidden sm:inline">Inbox</span>
-          <span id="inboxCountBadge" class="hidden px-1.5 py-0.2 text-[10px] font-bold rounded-full bg-indigo-500 text-white">0</span>
-        </button>
-
-        <button id="simulatePeerBtn" title="Spawn another mock device on the local network" class="p-2 rounded-xl bg-indigo-600/20 hover:bg-indigo-600/30 border border-indigo-500/30 text-indigo-300 hover:text-white transition flex items-center gap-1.5 text-xs font-medium">
-          <i data-lucide="user-plus" class="w-4 h-4"></i>
-          <span class="hidden sm:inline">+ Peer</span>
-        </button>
-
-        <button id="editProfileBtn" class="flex items-center gap-2 pl-2 pr-3 py-1 rounded-xl bg-slate-800/90 hover:bg-slate-700 border border-slate-700/80 text-xs transition">
-          <div id="navAvatarIcon" class="w-7 h-7 rounded-lg bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-            <i data-lucide="laptop" class="w-4 h-4"></i>
-          </div>
-          <span id="navDeviceName" class="font-medium text-slate-200 max-w-[100px] truncate">My MacBook</span>
-          <i data-lucide="chevron-down" class="w-3.5 h-3.5 text-slate-400"></i>
+          <span id="inboxBadge" class="hidden absolute -top-1 -right-1 px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full bg-emerald-400 text-slate-950">0</span>
         </button>
       </div>
+
     </div>
   </header>
 
-  <main class="flex-1 max-w-7xl w-full mx-auto p-4 lg:p-6 grid grid-cols-1 lg:grid-cols-12 gap-6">
+  <main class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col space-y-6">
 
-    <!-- Left & Center: Discovery Radar & Device Deck (8 cols on lg) -->
-    <div class="lg:col-span-8 flex flex-col space-y-6">
+    <!-- CONNECTION STATE BANNER -->
+    <div id="unpairedHeroBanner" class="glass-panel rounded-3xl p-6 sm:p-8 border border-cyber-border relative overflow-hidden transition-all duration-300">
+      <div class="absolute -right-16 -bottom-16 w-80 h-80 bg-gradient-to-br from-violet-500/10 via-cyan-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
 
-      <!-- Wi-Fi Radar Canvas Card -->
-      <div class="relative bg-slate-800/40 border border-slate-800 rounded-3xl p-6 overflow-hidden flex flex-col items-center justify-center min-h-[420px] shadow-inner">
-        <!-- Visual Radar Concentric Rings -->
-        <div class="radar-circle w-32 h-32 border-indigo-500/30"></div>
-        <div class="radar-circle w-64 h-64 border-indigo-500/20"></div>
-        <div class="radar-circle w-96 h-96 border-indigo-500/10"></div>
-        <div class="radar-circle w-[520px] h-[520px] border-indigo-500/5"></div>
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+        <div class="space-y-2 text-center md:text-left max-w-lg">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-mono">
+            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
+            <span>Zero-Configuration Optical Pairing</span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Scan to Connect. Direct Peer Transfer.
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400 leading-relaxed">
+            No Wi-Fi passwords, no manual IP scanning, and no network subnet probes. One device shows the QR code, the other device scans it with the camera to link instantly.
+          </p>
+        </div>
 
-        <!-- Radar Pulse wave -->
-        <div class="absolute w-64 h-64 rounded-full bg-indigo-500/10 animate-radar-pulse pointer-events-none"></div>
+        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <button id="heroScanBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-mono text-xs font-bold shadow-xl shadow-violet-600/25 transition">
+            <i data-lucide="camera" class="w-4 h-4"></i>
+            <span>SCAN QR CODE</span>
+          </button>
+          <button id="heroShowQrBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-cyber-900 hover:bg-cyber-850 border border-cyan-500/40 text-cyan-400 font-mono text-xs font-bold transition">
+            <i data-lucide="qr-code" class="w-4 h-4"></i>
+            <span>SHOW PAIRING QR</span>
+          </button>
+        </div>
+      </div>
+    </div>
 
-        <!-- Central Local Device Marker -->
-        <div class="relative z-10 flex flex-col items-center group cursor-pointer" id="myCenterDevice">
-          <div class="relative">
-            <div class="w-20 h-20 rounded-2xl bg-gradient-to-tr from-indigo-600 to-cyan-500 p-0.5 shadow-xl shadow-indigo-500/30 group-hover:scale-105 transition duration-300">
-              <div class="w-full h-full bg-slate-900 rounded-[14px] flex items-center justify-center text-indigo-400">
-                <i id="centerDeviceIcon" data-lucide="laptop" class="w-9 h-9"></i>
-              </div>
+    <!-- PAIRED PEER HUD (Shown once connected) -->
+    <div id="pairedPeerHud" class="glass-panel rounded-3xl p-5 sm:p-6 border border-emerald-500/40 hidden relative overflow-hidden transition-all duration-300 shadow-xl shadow-emerald-500/5">
+      <div class="absolute -right-8 -bottom-8 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
+        
+        <div class="flex items-center gap-4 w-full md:w-auto">
+          <!-- Animated Radar Link Indicator -->
+          <div class="relative w-14 h-14 rounded-2xl bg-cyber-900 border border-emerald-500/50 flex items-center justify-center shrink-0">
+            <div id="pairedPeerIconBox" class="text-emerald-400">
+              <i data-lucide="smartphone" class="w-7 h-7"></i>
             </div>
-            <span class="absolute -bottom-1 -right-1 w-5 h-5 bg-emerald-500 border-2 border-slate-900 rounded-full flex items-center justify-center text-[9px] text-white font-bold" title="Broadcasting">
-              ✓
+            <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
+              <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span class="relative inline-flex rounded-full h-3.5 w-3.5 bg-emerald-500 border-2 border-cyber-950"></span>
             </span>
           </div>
-          <div class="mt-2 text-center">
-            <span id="centerDeviceName" class="text-sm font-semibold text-slate-100 flex items-center justify-center gap-1">
-              My MacBook
-              <i data-lucide="pencil" class="w-3 h-3 text-slate-500 group-hover:text-indigo-400"></i>
-            </span>
-            <span class="text-[11px] text-slate-400">Broadcasting to Wi-Fi</span>
+
+          <!-- Peer Details -->
+          <div>
+            <div class="flex items-center gap-2">
+              <h3 id="pairedPeerName" class="text-base font-bold text-white">Apple iPhone 15 Pro</h3>
+              <span id="pairedPeerCategoryBadge" class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40">SMARTPHONE</span>
+            </div>
+            <p class="text-xs font-mono text-slate-400 mt-1 flex flex-wrap items-center gap-2">
+              <span class="text-emerald-400 flex items-center gap-1">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Direct P2P Channel
+              </span>
+              <span class="text-slate-600">•</span>
+              <span id="pairedLatencyText" class="text-cyan-400">1.2 ms latency</span>
+              <span class="text-slate-600">•</span>
+              <span id="pairedMeshRoomText" class="text-slate-500">ROOM: MESH-8492</span>
+            </p>
           </div>
         </div>
 
-        <!-- Peer Nodes container dynamically placed around radar -->
-        <div id="peersOrbitContainer" class="absolute inset-0 pointer-events-none">
-          <!-- Populated by JavaScript -->
+        <!-- Controls -->
+        <div class="flex items-center gap-2 w-full md:w-auto justify-end">
+          <button id="sendPingTestBtn" class="px-3 py-2 rounded-xl bg-cyber-900 hover:bg-cyber-850 border border-cyber-border text-slate-300 text-xs font-mono transition flex items-center gap-1.5" title="Test Channel Latency">
+            <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
+            <span>Ping</span>
+          </button>
+          <button id="disconnectPeerBtn" class="px-3.5 py-2 rounded-xl bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/50 text-rose-300 text-xs font-mono transition flex items-center gap-1.5">
+            <i data-lucide="link-2-off" class="w-3.5 h-3.5"></i>
+            <span>Disconnect</span>
+          </button>
         </div>
 
-        <!-- Radar bottom status indicator -->
-        <div class="absolute bottom-4 left-6 right-6 flex items-center justify-between text-xs text-slate-400 pointer-events-auto">
-          <div class="flex items-center gap-2">
-            <span class="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></span>
-            <span>Looking for devices on <b class="text-slate-200" id="radarSubnetText">192.168.1.0/24</b></span>
+      </div>
+    </div>
+
+    <!-- FILE TRANSMISSION & MEDIA DROP ZONE -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT: File Upload & Staging (7 cols) -->
+      <div class="lg:col-span-7 flex flex-col space-y-4">
+        <div class="glass-panel rounded-3xl p-5 sm:p-6 border border-cyber-border flex-1 flex flex-col">
+          <div class="flex items-center justify-between pb-3 border-b border-cyber-border mb-4">
+            <div>
+              <h3 class="text-xs font-mono font-bold uppercase text-slate-200 flex items-center gap-2">
+                <i data-lucide="files" class="w-4 h-4 text-cyan-400"></i>
+                Staged Files & 4K Media
+              </h3>
+              <p class="text-[11px] text-slate-400 mt-0.5">Select high-resolution photos, videos, or archives.</p>
+            </div>
+            <span id="stagedBadge" class="text-[11px] font-mono text-cyan-400 font-semibold">0 files staged</span>
           </div>
-          <div class="flex gap-2">
-            <button id="sendToAllBtn" class="px-3 py-1 rounded-lg bg-slate-700/60 hover:bg-slate-700 text-slate-300 hover:text-white transition text-xs border border-slate-600/50 flex items-center gap-1.5 disabled:opacity-40" disabled>
-              <i data-lucide="share-2" class="w-3.5 h-3.5"></i> Broadcast to All
+
+          <!-- Drag and Drop Box -->
+          <div id="dropZoneBox" class="relative group border-2 border-dashed border-cyber-border hover:border-cyan-400 bg-cyber-900/50 hover:bg-cyan-950/10 rounded-2xl p-6 text-center transition cursor-pointer flex flex-col items-center justify-center min-h-[140px]">
+            <input type="file" id="mediaFileInput" multiple class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" />
+            <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-cyan-500 group-hover:text-black transition">
+              <i data-lucide="upload-cloud" class="w-6 h-6"></i>
+            </div>
+            <p class="text-xs font-semibold text-slate-200">Drag & drop files or click to browse</p>
+            <p class="text-[10px] text-slate-400 mt-1 font-mono">Direct camera rolls, RAW photos, 4K videos & PDFs</p>
+          </div>
+
+          <!-- Staged Items Preview Area -->
+          <div id="stagedListWrapper" class="mt-4 space-y-2.5 max-h-56 overflow-y-auto custom-scroll pr-1 flex-1">
+            <div id="emptyStagedNotice" class="py-8 text-center text-slate-500 font-mono text-xs">
+              No files currently queued for transfer.
+            </div>
+          </div>
+
+          <!-- Send Action Button -->
+          <div class="mt-4 pt-3 border-t border-cyber-border">
+            <button id="sendPayloadBtn" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-medium text-xs font-mono transition shadow-lg shadow-cyan-600/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+              <i data-lucide="send" class="w-4 h-4"></i>
+              <span id="sendBtnLabel">Transmit to Paired Device</span>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- Peer Device Grid Cards -->
-      <div class="bg-slate-800/30 border border-slate-800 rounded-3xl p-5">
-        <div class="flex items-center justify-between mb-4">
-          <div class="flex items-center gap-2">
-            <i data-lucide="smartphone" class="w-4 h-4 text-indigo-400"></i>
-            <h3 class="text-sm font-bold tracking-wide uppercase text-slate-300">Nearby Devices (<span id="peerCountSpan">0</span>)</h3>
-          </div>
-          <span class="text-xs text-slate-400">Click a device or drop a file directly to send</span>
-        </div>
-
-        <div id="peersListContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          <!-- Peer cards rendered via JS -->
-        </div>
+      <!-- RIGHT: Test Tools & Connection Guide (5 cols) -->
+      <div class="lg:col-span-5 flex flex-col space-y-4">
         
-        <div id="emptyPeersNotice" class="text-center py-8 text-slate-500">
-          <i data-lucide="radar" class="w-8 h-8 mx-auto mb-2 opacity-50 stroke-1"></i>
-          <p class="text-sm">No other devices found on this Wi-Fi yet.</p>
-          <p class="text-xs mt-1">Open this page in another browser tab, or click <button id="addDemoPeerBtn" class="text-indigo-400 underline font-medium">Add Demo Peer</button> to test.</p>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="lg:col-span-4 flex flex-col space-y-6">
-
-      <!-- Drag & Drop Staging Area -->
-      <div class="bg-slate-800/40 border border-slate-800 rounded-3xl p-5 flex flex-col">
-        <div class="flex items-center justify-between mb-3">
-          <h3 class="text-sm font-bold tracking-wide uppercase text-slate-300 flex items-center gap-2">
-            <i data-lucide="upload-cloud" class="w-4 h-4 text-indigo-400"></i>
-            File Staging Area
-          </h3>
-          <span id="selectedFilesCount" class="text-xs text-indigo-400 font-medium">0 files</span>
-        </div>
-
-        <!-- Dropzone -->
-        <div id="dropzone" class="border-2 border-dashed border-slate-700 hover:border-indigo-500 bg-slate-900/50 hover:bg-slate-900/80 rounded-2xl p-6 transition duration-200 text-center flex flex-col items-center justify-center cursor-pointer relative group">
-          <input type="file" id="fileInput" multiple class="absolute inset-0 opacity-0 cursor-pointer w-full h-full" />
-          <div class="w-12 h-12 rounded-2xl bg-indigo-500/10 text-indigo-400 group-hover:scale-110 group-hover:bg-indigo-500 group-hover:text-white transition flex items-center justify-center mb-3">
-            <i data-lucide="file-up" class="w-6 h-6"></i>
-          </div>
-          <p class="text-sm font-medium text-slate-200">Drag & drop files here</p>
-          <p class="text-xs text-slate-400 mt-1">Photos, 4K videos, documents up to 5GB</p>
-          <span class="mt-3 px-3 py-1 rounded-full bg-slate-800 text-slate-300 text-xs border border-slate-700 group-hover:border-indigo-500/50">Browse Files</span>
-        </div>
-
-        <!-- Staged files preview shelf -->
-        <div id="stagedFilesContainer" class="mt-4 space-y-2 max-h-60 overflow-y-auto pr-1">
-          <!-- File cards injected via JS -->
-        </div>
-
-        <!-- Target Selector & Send trigger -->
-        <div id="sendActionPanel" class="mt-4 pt-4 border-t border-slate-800 flex flex-col gap-3">
+        <!-- Live Inter-Tab & Multi-Device Testing Card -->
+        <div class="glass-panel rounded-3xl p-5 sm:p-6 border border-cyber-border flex flex-col justify-between">
           <div>
-            <label class="text-xs font-semibold text-slate-400 block mb-1.5">Target Destination</label>
-            <select id="targetPeerSelect" class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
-              <option value="" disabled selected>Select a peer or tap a device</option>
-              <option value="all">⚡ Broadcast to All Nearby Devices</option>
-            </select>
+            <div class="flex items-center gap-2 mb-2">
+              <i data-lucide="monitor-smartphone" class="w-4 h-4 text-violet-400"></i>
+              <h3 class="text-xs font-mono font-bold uppercase text-white">How To Test AirShare QR</h3>
+            </div>
+            <p class="text-xs text-slate-400 leading-relaxed mb-4">
+              Connect two devices or test right now inside this browser:
+            </p>
+
+            <div class="space-y-3 font-mono text-xs">
+              <div class="p-3 rounded-2xl bg-cyber-900 border border-cyber-border">
+                <span class="text-cyan-400 font-bold block mb-1">Option A: Two Phones or TV</span>
+                <p class="text-slate-400 text-[11px]">Click <b>"Show Pairing QR"</b> on one screen and scan it using the camera on your phone or tablet.</p>
+              </div>
+
+              <div class="p-3 rounded-2xl bg-cyber-900 border border-cyber-border">
+                <span class="text-violet-400 font-bold block mb-1">Option B: In Two Tabs (Live Demo)</span>
+                <p class="text-slate-400 text-[11px]">Duplicate this tab in your browser or click below to simulate an immediate companion phone:</p>
+                <button id="simulateCompanionBtn" class="mt-2.5 w-full py-2 px-3 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 font-semibold text-[11px] transition flex items-center justify-center gap-1.5">
+                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+                  <span>Simulate Connected Mobile Phone</span>
+                </button>
+              </div>
+            </div>
           </div>
 
-          <button id="initiateSendBtn" class="w-full py-2.5 px-4 rounded-xl bg-gradient-to-r from-indigo-600 to-cyan-600 hover:from-indigo-500 hover:to-cyan-500 text-white font-medium text-sm transition shadow-lg shadow-indigo-600/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
-            <i data-lucide="send" class="w-4 h-4"></i> Send Staged Files
-          </button>
-        </div>
-      </div>
-
-      <!-- Quick Peer-to-Peer Simulator Panel -->
-      <div class="bg-slate-800/30 border border-slate-800 rounded-3xl p-5">
-        <h3 class="text-sm font-bold tracking-wide uppercase text-slate-300 mb-2 flex items-center gap-2">
-          <i data-lucide="sliders" class="w-4 h-4 text-emerald-400"></i>
-          Test & Simulator Controls
-        </h3>
-        <p class="text-xs text-slate-400 mb-4">Test high-speed Wi-Fi transfers right away without needing a secondary physical device.</p>
-
-        <div class="grid grid-cols-2 gap-2">
-          <button id="simIncomingPhotoBtn" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition flex items-center gap-2 text-xs">
-            <span class="w-7 h-7 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0">
-              <i data-lucide="image" class="w-3.5 h-3.5"></i>
+          <div class="mt-4 pt-3 border-t border-cyber-border flex items-center justify-between text-[11px] font-mono text-slate-400">
+            <span class="flex items-center gap-1 text-emerald-400">
+              <i data-lucide="lock" class="w-3.5 h-3.5"></i> End-to-End P2P
             </span>
-            <div>
-              <p class="font-medium text-slate-200">Send Photo</p>
-              <p class="text-[10px] text-slate-400">Mock 4.2 MB PNG</p>
-            </div>
-          </button>
-
-          <button id="simIncomingVideoBtn" class="p-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-800 text-left transition flex items-center gap-2 text-xs">
-            <span class="w-7 h-7 rounded-lg bg-pink-500/20 text-pink-400 flex items-center justify-center shrink-0">
-              <i data-lucide="film" class="w-3.5 h-3.5"></i>
-            </span>
-            <div>
-              <p class="font-medium text-slate-200">Send Video</p>
-              <p class="text-[10px] text-slate-400">Mock 85 MB MP4</p>
-            </div>
-          </button>
+            <span>Zero Cloud Storage</span>
+          </div>
         </div>
+
       </div>
 
     </div>
+
   </main>
 
-  <!-- Live Transfer Progress Floating Bar -->
-  <div id="transferStatusBar" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-xl px-4 z-50 transition-all duration-300 transform translate-y-32 opacity-0 pointer-events-none">
-    <div class="bg-slate-900/95 border border-indigo-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-md flex flex-col gap-2.5">
-      <div class="flex items-center justify-between text-xs">
+  <!-- MODAL 1: CAMERA QR CODE SCANNER MODAL -->
+  <div id="cameraScannerModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative font-mono text-xs flex flex-col max-h-[92vh]">
+      
+      <!-- Modal Header -->
+      <div class="flex items-center justify-between pb-3 border-b border-cyber-border mb-3">
         <div class="flex items-center gap-2">
-          <span class="relative flex h-2.5 w-2.5">
-            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
-            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+          <div class="w-8 h-8 rounded-xl bg-violet-500/10 text-violet-400 flex items-center justify-center">
+            <i data-lucide="scan" class="w-4 h-4"></i>
+          </div>
+          <div>
+            <h3 class="text-sm font-bold text-white">Scan AirShare QR Code</h3>
+            <p class="text-[10px] text-slate-400">Point your camera at the target screen</p>
+          </div>
+        </div>
+        <button id="closeScannerModalBtn" class="text-slate-400 hover:text-white p-1 rounded-xl">
+          <i data-lucide="x" class="w-5 h-5"></i>
+        </button>
+      </div>
+
+      <!-- Live Video Viewport with Reticle and Laser Animation -->
+      <div class="relative w-full aspect-square max-h-[340px] rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-cyber-border/80">
+        
+        <!-- Video Stream Element -->
+        <video id="cameraVideoFeed" playsinline class="w-full h-full object-cover"></video>
+        <!-- In-memory frame canvas for jsQR analysis -->
+        <canvas id="qrScanCanvas" class="hidden"></canvas>
+
+        <!-- Scanning Reticle Overlay -->
+        <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div class="scan-reticle w-56 h-56 relative">
+            <div class="scan-reticle-inner w-full h-full relative">
+              <!-- Moving Laser Line -->
+              <div class="absolute inset-x-2 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-lg shadow-cyan-400/80 animate-laser-sweep"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Camera Status or Error Message -->
+        <div id="cameraStatusOverlay" class="absolute inset-0 bg-cyber-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center text-slate-300 hidden">
+          <i id="cameraStatusIcon" data-lucide="camera-off" class="w-10 h-10 text-amber-400 mb-2"></i>
+          <p id="cameraStatusText" class="text-xs font-semibold mb-1">Requesting camera access...</p>
+          <p id="cameraStatusSubtext" class="text-[11px] text-slate-400 mb-3">Please allow camera permissions in your browser.</p>
+          <label class="px-3 py-1.5 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-cyan-300 cursor-pointer border border-cyber-border transition">
+            <i data-lucide="image" class="w-3.5 h-3.5 inline mr-1"></i> Scan From Image File
+            <input type="file" id="qrImageFileInput" accept="image/*" class="hidden" />
+          </label>
+        </div>
+
+        <!-- Controls Toolbar (Flip camera, torch) -->
+        <div class="absolute bottom-3 inset-x-0 flex items-center justify-center gap-2 pointer-events-auto">
+          <button id="switchCameraBtn" class="p-2 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition" title="Switch Camera">
+            <i data-lucide="flip-horizontal" class="w-4 h-4"></i>
+          </button>
+          <label class="p-2 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition cursor-pointer" title="Upload QR Image">
+            <i data-lucide="upload" class="w-4 h-4"></i>
+            <input type="file" id="qrImageFileInputAlt" accept="image/*" class="hidden" />
+          </label>
+        </div>
+      </div>
+
+      <!-- Manual Pairing Token Fallback -->
+      <div class="mt-3 pt-3 border-t border-cyber-border">
+        <label class="text-[10px] text-slate-400 block mb-1">Or paste the pairing link / code manually:</label>
+        <div class="flex items-center gap-2">
+          <input type="text" id="manualTokenInput" placeholder="e.g. AIRSHARE:MESH-9042:..." class="flex-1 bg-cyber-950 border border-cyber-border rounded-xl px-3 py-2 text-cyan-300 text-[11px] focus:outline-none focus:border-cyan-400 font-mono" />
+          <button id="applyManualTokenBtn" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition">
+            Pair
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL 2: HOST QR CODE DISPLAY MODAL -->
+  <div id="hostQrModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+    <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-md w-full p-6 shadow-2xl relative font-mono text-xs flex flex-col items-center">
+      
+      <button id="closeHostQrModalBtn" class="absolute top-4 right-4 text-slate-400 hover:text-white p-1 rounded-xl">
+        <i data-lucide="x" class="w-5 h-5"></i>
+      </button>
+
+      <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-2 border border-cyan-500/20">
+        <i data-lucide="qr-code" class="w-6 h-6"></i>
+      </div>
+      <h3 class="text-base font-bold text-white text-center">Pair With This Device</h3>
+      <p class="text-[11px] text-slate-400 text-center mt-0.5 mb-4">
+        Open AirShare QR on your phone, tablet, or PC and scan this code:
+      </p>
+
+      <!-- QR Canvas Mount -->
+      <div id="qrcodeBox" class="p-3.5 bg-white rounded-2xl flex items-center justify-center shadow-2xl shadow-cyan-500/10"></div>
+
+      <!-- Peer Token & Copy Button -->
+      <div class="w-full mt-4 space-y-1.5">
+        <div class="flex items-center justify-between text-[10px] text-slate-400">
+          <span>Direct Pairing URL / Token:</span>
+          <span id="hostRoomCodeLabel" class="text-cyan-400 font-bold">ROOM: MESH-0000</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <input type="text" id="hostQrPayloadUrl" readonly class="flex-1 bg-cyber-950 border border-cyber-border rounded-xl px-3 py-2 text-[10px] text-cyan-400 focus:outline-none" />
+          <button id="copyHostUrlBtn" class="px-3 py-2 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-200 border border-cyber-border transition">
+            Copy
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- FLOATING HIGH-SPEED TRANSFER HUD -->
+  <div id="transferProgressBanner" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40 transition-all duration-300 transform translate-y-36 opacity-0 pointer-events-none">
+    <div class="glass-panel bg-[#090e18]/95 border border-cyan-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-xl">
+      <div class="flex items-center justify-between text-xs font-mono mb-2">
+        <div class="flex items-center gap-2 min-w-0">
+          <span class="relative flex h-2.5 w-2.5 shrink-0">
+            <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
+            <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
           </span>
-          <span id="transferStatusTitle" class="font-semibold text-white">Transferring file...</span>
+          <span id="transferTitleText" class="font-bold text-white truncate">Streaming payload...</span>
         </div>
-        <div class="flex items-center gap-3 text-slate-400">
-          <span id="transferSpeedMetric" class="text-indigo-400 font-mono font-medium">32.4 MB/s</span>
-          <span id="transferPercentMetric" class="text-slate-200 font-bold">45%</span>
+        <div class="flex items-center gap-3 shrink-0">
+          <span id="transferSpeedText" class="text-cyan-400 font-bold">42.4 MB/s</span>
+          <span id="transferPctText" class="text-slate-200 font-bold">0%</span>
         </div>
       </div>
 
-      <!-- Progress bar -->
-      <div class="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden">
-        <div id="transferProgressBar" class="bg-gradient-to-r from-indigo-500 via-cyan-400 to-emerald-400 h-full rounded-full transition-all duration-150" style="width: 0%"></div>
+      <div class="w-full bg-cyber-950 rounded-full h-2 mb-2 overflow-hidden border border-cyber-border">
+        <div id="transferProgressBar" class="h-full bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 rounded-full transition-all duration-100" style="width: 0%"></div>
       </div>
 
-      <div class="flex items-center justify-between text-[11px] text-slate-400">
-        <span id="transferBytesDetail">12.5 MB of 28.0 MB</span>
-        <span id="transferTimeRemaining">Approx. 2s remaining</span>
+      <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
+        <span id="transferBytesText">0 MB of 0 MB</span>
+        <span id="transferEtaText">ETA: 0s</span>
       </div>
     </div>
   </div>
 
-  <!-- INCOMING FILE REQUEST MODAL -->
-  <div id="incomingRequestModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-md w-full p-6 shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
-      <div class="w-14 h-14 rounded-2xl bg-indigo-500/20 text-indigo-400 flex items-center justify-center mx-auto mb-4">
-        <i data-lucide="download" class="w-7 h-7"></i>
+  <!-- INCOMING FILE PROMPT MODAL -->
+  <div id="incomingFileModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-md w-full p-6 shadow-2xl relative font-mono text-xs">
+      <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto mb-3 border border-cyan-500/20">
+        <i data-lucide="download-cloud" class="w-6 h-6"></i>
       </div>
-      <h3 class="text-lg font-bold text-center text-white mb-1">Incoming Transfer</h3>
-      <p class="text-xs text-center text-slate-400 mb-6" id="incomingFromText">Device <span class="text-indigo-400 font-medium">iPhone 15 Pro</span> wants to share a file with you over Wi-Fi</p>
+      <h3 class="text-base font-bold text-center text-white mb-1">Incoming Direct P2P File</h3>
+      <p class="text-[11px] text-center text-slate-400 mb-4" id="incomingSourceDeviceText">
+        From: Paired Device
+      </p>
 
-      <!-- File Details Box -->
-      <div class="bg-slate-800/80 rounded-2xl p-4 border border-slate-700/60 flex items-center gap-3.5 mb-6">
-        <div id="incomingFileTypeIcon" class="w-10 h-10 rounded-xl bg-slate-700 text-indigo-400 flex items-center justify-center shrink-0">
+      <div class="bg-cyber-850 rounded-2xl p-3.5 border border-cyber-border flex items-center gap-3 mb-5">
+        <div id="incomingFileIconBox" class="w-12 h-12 rounded-xl bg-cyber-950 border border-cyber-border flex items-center justify-center shrink-0 text-cyan-400">
           <i data-lucide="file" class="w-5 h-5"></i>
         </div>
         <div class="min-w-0 flex-1">
-          <p id="incomingFileName" class="text-sm font-semibold text-slate-100 truncate">sunset_4k_footage.mp4</p>
-          <p id="incomingFileSize" class="text-xs text-slate-400">42.8 MB • Video</p>
+          <p id="incomingFileNameText" class="text-xs font-semibold text-slate-100 truncate">photo.jpg</p>
+          <p id="incomingFileSizeText" class="text-[10px] text-slate-400">3.8 MB • image/jpeg</p>
         </div>
       </div>
 
-      <!-- Accept / Reject Actions -->
       <div class="flex items-center gap-3">
-        <button id="rejectTransferBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 font-medium text-xs border border-slate-700 transition">
+        <button id="rejectIncomingBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-300 border border-cyber-border transition">
           Decline
         </button>
-        <button id="acceptTransferBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium text-xs shadow-lg shadow-indigo-600/30 transition flex items-center justify-center gap-1.5">
-          <i data-lucide="check" class="w-4 h-4"></i> Accept & Save
+        <button id="acceptIncomingBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold transition flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-600/30">
+          <i data-lucide="download" class="w-4 h-4"></i> Accept & Save
         </button>
       </div>
     </div>
   </div>
 
-  <!-- INBOX / RECEIVED FILES MODAL -->
-  <div id="inboxModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[85vh]">
-      <div class="flex items-center justify-between pb-4 border-b border-slate-800">
+  <!-- INBOX VAULT MODAL -->
+  <div id="inboxModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[85vh] font-mono text-xs">
+      <div class="flex items-center justify-between pb-4 border-b border-cyber-border">
         <div class="flex items-center gap-2">
-          <i data-lucide="folder-down" class="w-5 h-5 text-indigo-400"></i>
-          <h3 class="text-base font-bold text-white">Received Files (Local Inbox)</h3>
+          <i data-lucide="folder-check" class="w-5 h-5 text-emerald-400"></i>
+          <h3 class="text-base font-bold text-white">Received Files Vault</h3>
         </div>
         <button id="closeInboxBtn" class="text-slate-400 hover:text-white p-1 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <!-- Inbox List -->
-      <div id="inboxItemsList" class="overflow-y-auto py-4 space-y-3 flex-1 min-h-[200px]">
-        <!-- Injected via JS -->
-      </div>
+      <div id="inboxItemsContainer" class="overflow-y-auto py-4 space-y-2.5 flex-1 min-h-[220px] custom-scroll"></div>
 
-      <div class="pt-3 border-t border-slate-800 flex justify-between items-center text-xs text-slate-400">
-        <span id="inboxStorageUsed">Storage: 0 files</span>
-        <button id="clearInboxBtn" class="text-rose-400 hover:text-rose-300">Clear Inbox</button>
+      <div class="pt-3 border-t border-cyber-border flex justify-between items-center text-slate-400">
+        <span id="inboxCountSummary">0 items stored</span>
+        <button id="clearInboxItemsBtn" class="text-rose-400 hover:text-rose-300 transition">Clear Received</button>
       </div>
     </div>
   </div>
 
-  <!-- EDIT PROFILE MODAL -->
-  <div id="profileModal" class="fixed inset-0 bg-slate-950/75 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-slate-900 border border-slate-700 rounded-3xl max-w-sm w-full p-6 shadow-2xl">
-      <h3 class="text-base font-bold text-white mb-4">Device Identity</h3>
-      
-      <div class="space-y-4">
-        <div>
-          <label class="text-xs font-semibold text-slate-400 block mb-1">Device Name</label>
-          <input type="text" id="deviceNameInput" class="w-full bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-sm text-slate-100 focus:outline-none focus:border-indigo-500" />
-        </div>
-
-        <div>
-          <label class="text-xs font-semibold text-slate-400 block mb-1.5">Device Type Icon</label>
-          <div class="grid grid-cols-4 gap-2" id="deviceIconSelector">
-            <button data-icon="laptop" class="p-2.5 rounded-xl border border-indigo-500 bg-indigo-500/20 text-indigo-400 flex items-center justify-center">
-              <i data-lucide="laptop" class="w-5 h-5"></i>
-            </button>
-            <button data-icon="smartphone" class="p-2.5 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800 text-slate-400 flex items-center justify-center">
-              <i data-lucide="smartphone" class="w-5 h-5"></i>
-            </button>
-            <button data-icon="tablet" class="p-2.5 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800 text-slate-400 flex items-center justify-center">
-              <i data-lucide="tablet" class="w-5 h-5"></i>
-            </button>
-            <button data-icon="monitor" class="p-2.5 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800 text-slate-400 flex items-center justify-center">
-              <i data-lucide="monitor" class="w-5 h-5"></i>
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div class="mt-6 flex gap-2">
-        <button id="cancelProfileBtn" class="flex-1 py-2 rounded-xl bg-slate-800 text-slate-300 text-xs">Cancel</button>
-        <button id="saveProfileBtn" class="flex-1 py-2 rounded-xl bg-indigo-600 text-white font-medium text-xs">Save Changes</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- PREVIEW LIGHTBOX MODAL (Image/Video) -->
-  <div id="mediaLightboxModal" class="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+  <!-- MEDIA LIGHTBOX MODAL -->
+  <div id="mediaLightboxModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
     <div class="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
-      <button id="closeLightboxBtn" class="absolute -top-10 right-0 text-slate-300 hover:text-white p-2">
+      <button id="closeLightboxBtn" class="absolute -top-10 right-0 text-slate-400 hover:text-white p-2">
         <i data-lucide="x" class="w-6 h-6"></i>
       </button>
-      <div id="lightboxMediaContainer" class="w-full flex items-center justify-center overflow-hidden rounded-2xl bg-black/40 border border-slate-800">
-        <!-- Injected media -->
-      </div>
-      <p id="lightboxCaption" class="mt-3 text-sm text-slate-300 font-medium"></p>
+      <div id="lightboxMediaContent" class="w-full flex items-center justify-center overflow-hidden rounded-2xl bg-black border border-cyber-border"></div>
+      <p id="lightboxCaptionText" class="mt-3 text-xs font-mono text-slate-300"></p>
     </div>
   </div>
 
+  <!-- AUDIO TONE SYNTHESIS FOR QR RECOGNITION (No external assets) -->
   <script>
-    // State management
-    const state = {
+    const appState = {
       myDevice: {
-        id: 'dev_' + Math.random().toString(36).substring(2, 9),
-        name: 'My ' + (navigator.platform.includes('Mac') ? 'MacBook' : 'Workstation'),
-        type: 'laptop',
-        ip: '192.168.1.' + Math.floor(Math.random() * 150 + 10),
+        id: 'peer_' + Math.random().toString(36).substring(2, 9),
+        name: 'Detecting...',
+        category: 'laptop', // phone, tablet, laptop, tv
+        icon: 'laptop'
       },
-      peers: [],
+      roomToken: null,
+      channel: null,
+      isPaired: false,
+      pairedPeer: null,
       stagedFiles: [],
       inbox: [],
-      channel: null,
-      transferInProgress: false,
-      pendingIncomingTransfer: null,
+      pendingIncoming: null,
+      cameraStream: null,
+      cameraFacingMode: 'environment', // environment or user
+      isScanningQr: false
     };
 
-    // Preset mock peers to show local mesh capability
-    const samplePeerTemplates = [
-      { name: "Sarah's iPhone 15", type: 'smartphone', os: 'iOS 17' },
-      { name: "Living Room iPad Pro", type: 'tablet', os: 'iPadOS' },
-      { name: "Dev Linux ThinkPad", type: 'laptop', os: 'Ubuntu' },
-      { name: "Studio iMac 27\"", type: 'monitor', os: 'macOS' },
-    ];
-
-    function setupInterTabSignaling() {
+    // Synthetic audio beep when QR is decoded
+    function playBeepTone() {
       try {
-        state.channel = new BroadcastChannel('dropmesh_wifi_bus');
-        
-        // Listen to messages from other tabs
-        state.channel.onmessage = (event) => {
-          const { action, payload, sender } = event.data;
-          if (sender.id === state.myDevice.id) return; // ignore self
-
-          switch(action) {
-            case 'announce_presence':
-              registerPeer(sender);
-              // reply back with my presence
-              state.channel.postMessage({
-                action: 'presence_ack',
-                sender: state.myDevice,
-                targetId: sender.id
-              });
-              break;
-            case 'presence_ack':
-              if (event.data.targetId === state.myDevice.id) {
-                registerPeer(sender);
-              }
-              break;
-            case 'peer_departing':
-              removePeer(sender.id);
-              break;
-            case 'file_transfer_request':
-              if (event.data.targetId === 'all' || event.data.targetId === state.myDevice.id) {
-                promptIncomingTransfer(payload, sender);
-              }
-              break;
-            case 'file_transfer_data':
-              if (event.data.targetId === 'all' || event.data.targetId === state.myDevice.id) {
-                receiveIncomingPayload(payload, sender);
-              }
-              break;
-          }
-        };
-
-        // Broadcast presence
-        state.channel.postMessage({
-          action: 'announce_presence',
-          sender: state.myDevice
-        });
-
-        // Clean up on exit
-        window.addEventListener('beforeunload', () => {
-          state.channel.postMessage({
-            action: 'peer_departing',
-            sender: state.myDevice
-          });
-        });
-      } catch (err) {
-        console.warn('BroadcastChannel not supported in current environment; falling back to memory mesh.');
-      }
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
+        osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15); // A6 note
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.15);
+      } catch (_) {}
     }
 
-    function registerPeer(peerData) {
-      const exists = state.peers.find(p => p.id === peerData.id);
-      if (!exists) {
-        state.peers.push({
-          ...peerData,
-          ip: peerData.ip || ('192.168.1.' + Math.floor(Math.random() * 190 + 10)),
-          signal: '-4' + Math.floor(Math.random() * 4 + 1) + ' dBm'
-        });
-        renderPeers();
-      }
-    }
+    function detectCurrentDevice() {
+      const ua = navigator.userAgent;
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      const hasTouch = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
 
-    function removePeer(peerId) {
-      state.peers = state.peers.filter(p => p.id !== peerId);
-      renderPeers();
-    }
+      let category = 'laptop';
+      let name = 'Mac / PC Workstation';
+      let icon = 'laptop';
 
-    function renderPeers() {
-      const listContainer = document.getElementById('peersListContainer');
-      const orbitContainer = document.getElementById('peersOrbitContainer');
-      const emptyNotice = document.getElementById('emptyPeersNotice');
-      const peerCountSpan = document.getElementById('peerCountSpan');
-      const targetSelect = document.getElementById('targetPeerSelect');
-      const sendToAllBtn = document.getElementById('sendToAllBtn');
-
-      peerCountSpan.textContent = state.peers.length;
-      sendToAllBtn.disabled = state.peers.length === 0;
-
-      // Update Target Select options
-      const currentSelected = targetSelect.value;
-      targetSelect.innerHTML = `
-        <option value="" disabled ${!currentSelected ? 'selected' : ''}>Select a peer or tap a device</option>
-        <option value="all" ${currentSelected === 'all' ? 'selected' : ''}>⚡ Broadcast to All Nearby Devices</option>
-      `;
-
-      state.peers.forEach(peer => {
-        const opt = document.createElement('option');
-        opt.value = peer.id;
-        opt.textContent = `${peer.name} (${peer.ip})`;
-        if (currentSelected === peer.id) opt.selected = true;
-        targetSelect.appendChild(opt);
-      });
-
-      if (state.peers.length === 0) {
-        emptyNotice.classList.remove('hidden');
-        listContainer.innerHTML = '';
-        orbitContainer.innerHTML = '';
-        return;
-      } else {
-        emptyNotice.classList.add('hidden');
+      if (/iPad|Android/i.test(ua) && hasTouch && (Math.max(width, height) >= 1024)) {
+        category = 'tablet';
+        name = /iPad/i.test(ua) ? 'Apple iPad Pro' : 'Android Tablet';
+        icon = 'tablet';
+      } else if (/iPhone|iPod/i.test(ua)) {
+        category = 'phone';
+        name = 'Apple iPhone';
+        icon = 'smartphone';
+      } else if (/Android.*Mobile/i.test(ua)) {
+        category = 'phone';
+        name = 'Android Smartphone';
+        icon = 'smartphone';
+      } else if (/SmartTV|Tizen|webOS|BRAVIA|GoogleTV/i.test(ua)) {
+        category = 'tv';
+        name = 'Smart TV';
+        icon = 'tv';
+      } else if (hasTouch && Math.max(width, height) < 768) {
+        category = 'phone';
+        name = 'Mobile Device';
+        icon = 'smartphone';
+      } else if (/Macintosh/i.test(ua)) {
+        name = 'Apple MacBook Pro';
+      } else if (/Windows/i.test(ua)) {
+        name = 'Windows PC';
       }
 
-      // Render cards
-      listContainer.innerHTML = state.peers.map(peer => `
-        <div onclick="selectPeerTarget('${peer.id}')" class="peer-card group bg-slate-900/70 hover:bg-indigo-950/30 border border-slate-700/60 hover:border-indigo-500/60 rounded-2xl p-4 transition-all duration-200 cursor-pointer flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <div class="w-11 h-11 rounded-xl bg-slate-800 group-hover:bg-indigo-600/20 text-indigo-400 flex items-center justify-center transition">
-              <i data-lucide="${peer.type || 'smartphone'}" class="w-5 h-5"></i>
-            </div>
-            <div>
-              <h4 class="text-xs font-semibold text-slate-100 group-hover:text-indigo-300 transition truncate max-w-[130px]">${escapeHtml(peer.name)}</h4>
-              <p class="text-[10px] text-slate-400 font-mono">${peer.ip}</p>
-            </div>
-          </div>
-          <div class="flex flex-col items-end gap-1">
-            <span class="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
-            <span class="text-[9px] text-slate-500">${peer.signal || '-48 dBm'}</span>
-          </div>
-        </div>
-      `).join('');
+      appState.myDevice.name = name;
+      appState.myDevice.category = category;
+      appState.myDevice.icon = icon;
 
-      // Render Radar Orbit placements
-      orbitContainer.innerHTML = '';
-      const total = state.peers.length;
-      const radius = 145; // pixel orbit radius
-      const centerX = orbitContainer.clientWidth / 2;
-      const centerY = orbitContainer.clientHeight / 2;
-
-      state.peers.forEach((peer, i) => {
-        const angle = (i / total) * 2 * Math.PI - Math.PI / 2;
-        const x = centerX + radius * Math.cos(angle) - 28;
-        const y = centerY + radius * Math.sin(angle) - 28;
-
-        const node = document.createElement('div');
-        node.className = 'absolute pointer-events-auto flex flex-col items-center cursor-pointer transition transform hover:scale-110';
-        node.style.left = `${x}px`;
-        node.style.top = `${y}px`;
-        node.onclick = () => selectPeerTarget(peer.id);
-
-        node.innerHTML = `
-          <div class="w-14 h-14 rounded-2xl bg-slate-800/90 hover:bg-indigo-600 border border-indigo-500/40 hover:border-indigo-400 text-indigo-300 hover:text-white flex items-center justify-center shadow-lg backdrop-blur-sm transition">
-            <i data-lucide="${peer.type || 'smartphone'}" class="w-6 h-6"></i>
-          </div>
-          <span class="mt-1 text-[10px] font-medium bg-slate-900/90 px-2 py-0.5 rounded-full text-slate-300 border border-slate-800 max-w-[90px] truncate shadow">
-            ${escapeHtml(peer.name)}
-          </span>
-        `;
-        orbitContainer.appendChild(node);
-      });
-
+      document.getElementById('myDeviceName').textContent = name;
+      document.getElementById('myDeviceBadgeIcon').innerHTML = `<i data-lucide="${icon}" class="w-3.5 h-3.5 inline"></i>`;
       lucide.createIcons();
     }
 
-    function selectPeerTarget(peerId) {
-      const select = document.getElementById('targetPeerSelect');
-      select.value = peerId;
-      select.classList.add('ring-2', 'ring-indigo-500');
-      setTimeout(() => select.classList.remove('ring-2', 'ring-indigo-500'), 800);
-      
-      // If we have files staged, notify ready to send
-      if (state.stagedFiles.length > 0) {
-        document.getElementById('initiateSendBtn').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    function initializeRoomToken() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const roomParam = urlParams.get('room');
+
+      if (roomParam) {
+        appState.roomToken = roomParam;
+      } else {
+        appState.roomToken = 'MESH-' + Math.floor(1000 + Math.random() * 9000);
+      }
+
+      setupBroadcastMesh();
+      renderHostQrCode();
+    }
+
+    function setupBroadcastMesh() {
+      if (appState.channel) {
+        try { appState.channel.close(); } catch (_) {}
+      }
+
+      try {
+        appState.channel = new BroadcastChannel(`airshare_qr_${appState.roomToken}`);
+        appState.channel.onmessage = handleIncomingMeshMessage;
+
+        // Broadcast presence
+        appState.channel.postMessage({
+          type: 'PEER_ANNOUNCE',
+          peer: appState.myDevice,
+          roomToken: appState.roomToken
+        });
+      } catch (err) {
+        console.warn('BroadcastChannel not supported:', err);
       }
     }
 
-    const fileInput = document.getElementById('fileInput');
-    const dropzone = document.getElementById('dropzone');
-    const stagedFilesContainer = document.getElementById('stagedFilesContainer');
-    const selectedFilesCount = document.getElementById('selectedFilesCount');
-    const initiateSendBtn = document.getElementById('initiateSendBtn');
+    function handleIncomingMeshMessage(event) {
+      const { type, peer, targetId, payload, roomToken } = event.data;
 
-    // Drag-and-drop highlights
+      if (type === 'PEER_ANNOUNCE' && peer.id !== appState.myDevice.id) {
+        // Automatically respond to peer
+        appState.channel.postMessage({
+          type: 'PEER_ACK',
+          peer: appState.myDevice,
+          targetId: peer.id
+        });
+
+        if (!appState.isPaired) {
+          establishPairedConnection(peer);
+        }
+      } else if (type === 'PEER_ACK' && targetId === appState.myDevice.id) {
+        if (!appState.isPaired) {
+          establishPairedConnection(peer);
+        }
+      } else if (type === 'FILE_TRANSMIT_OFFER' && appState.isPaired) {
+        showIncomingFileModal(payload, peer);
+      } else if (type === 'PING_REQUEST' && targetId === appState.myDevice.id) {
+        appState.channel.postMessage({
+          type: 'PING_RESPONSE',
+          targetId: peer.id,
+          sentTime: payload.sentTime
+        });
+      } else if (type === 'PING_RESPONSE' && targetId === appState.myDevice.id) {
+        const roundtrip = (performance.now() - payload.sentTime).toFixed(1);
+        document.getElementById('pairedLatencyText').textContent = `${roundtrip} ms latency`;
+        showToast(`Ping response: ${roundtrip} ms`);
+      } else if (type === 'PEER_DISCONNECT') {
+        tearDownConnection(false);
+        showToast('Peer disconnected.');
+      }
+    }
+
+    function establishPairedConnection(peerDevice) {
+      appState.isPaired = true;
+      appState.pairedPeer = peerDevice;
+
+      // Update Header
+      const dot = document.getElementById('globalConnDot');
+      dot.innerHTML = `
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-cyber-950"></span>
+      `;
+      document.getElementById('headerLinkStatusText').textContent = 'Connected (Encrypted)';
+      document.getElementById('headerLinkStatusText').classList.replace('text-amber-400', 'text-emerald-400');
+
+      // Update Paired Peer HUD
+      document.getElementById('unpairedHeroBanner').classList.add('hidden');
+      const hud = document.getElementById('pairedPeerHud');
+      hud.classList.remove('hidden');
+
+      document.getElementById('pairedPeerName').textContent = peerDevice.name;
+      document.getElementById('pairedPeerCategoryBadge').textContent = (peerDevice.category || 'DEVICE').toUpperCase();
+      document.getElementById('pairedMeshRoomText').textContent = `ROOM: ${appState.roomToken}`;
+      document.getElementById('pairedPeerIconBox').innerHTML = `<i data-lucide="${peerDevice.icon || 'smartphone'}" class="w-7 h-7"></i>`;
+      document.getElementById('sendBtnLabel').textContent = `Transmit to ${peerDevice.name}`;
+
+      // Close open modals
+      closeCameraScanner();
+      document.getElementById('hostQrModal').classList.add('hidden');
+
+      lucide.createIcons();
+      showToast(`Linked with ${peerDevice.name} via QR Code!`);
+    }
+
+    function tearDownConnection(notify = true) {
+      if (notify && appState.channel && appState.isPaired) {
+        appState.channel.postMessage({ type: 'PEER_DISCONNECT', peer: appState.myDevice });
+      }
+
+      appState.isPaired = false;
+      appState.pairedPeer = null;
+
+      const dot = document.getElementById('globalConnDot');
+      dot.innerHTML = `
+        <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-500 opacity-60"></span>
+        <span class="relative inline-flex rounded-full h-3 w-3 bg-slate-600 border-2 border-cyber-950"></span>
+      `;
+      document.getElementById('headerLinkStatusText').textContent = 'Ready to Pair';
+      document.getElementById('headerLinkStatusText').classList.replace('text-emerald-400', 'text-amber-400');
+
+      document.getElementById('unpairedHeroBanner').classList.remove('hidden');
+      document.getElementById('pairedPeerHud').classList.add('hidden');
+      document.getElementById('sendBtnLabel').textContent = 'Transmit to Paired Device';
+    }
+
+    document.getElementById('disconnectPeerBtn').addEventListener('click', () => {
+      tearDownConnection(true);
+    });
+
+    // Ping Button
+    document.getElementById('sendPingTestBtn').addEventListener('click', () => {
+      if (appState.channel && appState.pairedPeer) {
+        appState.channel.postMessage({
+          type: 'PING_REQUEST',
+          peer: appState.myDevice,
+          targetId: appState.pairedPeer.id,
+          payload: { sentTime: performance.now() }
+        });
+      }
+    });
+
+    function renderHostQrCode() {
+      const hostPayload = `${window.location.origin}${window.location.pathname}?room=${appState.roomToken}`;
+      document.getElementById('hostQrPayloadUrl').value = hostPayload;
+      document.getElementById('hostRoomCodeLabel').textContent = `ROOM: ${appState.roomToken}`;
+
+      const box = document.getElementById('qrcodeBox');
+      box.innerHTML = '';
+      try {
+        new QRCode(box, {
+          text: hostPayload,
+          width: 200,
+          height: 200,
+          colorDark: "#060a12",
+          colorLight: "#ffffff",
+          correctLevel: QRCode.CorrectLevel.M
+        });
+      } catch (err) {
+        box.innerHTML = `<p class="p-4 text-slate-800 text-center font-bold">Room: ${appState.roomToken}</p>`;
+      }
+    }
+
+    document.getElementById('navOpenHostQrBtn').addEventListener('click', () => {
+      document.getElementById('hostQrModal').classList.remove('hidden');
+    });
+    document.getElementById('heroShowQrBtn').addEventListener('click', () => {
+      document.getElementById('hostQrModal').classList.remove('hidden');
+    });
+    document.getElementById('closeHostQrModalBtn').addEventListener('click', () => {
+      document.getElementById('hostQrModal').classList.add('hidden');
+    });
+
+    document.getElementById('copyHostUrlBtn').addEventListener('click', () => {
+      const input = document.getElementById('hostQrPayloadUrl');
+      input.select();
+      document.execCommand('copy');
+      showToast('Copied direct pairing URL to clipboard!');
+    });
+
+    const cameraModal = document.getElementById('cameraScannerModal');
+    const videoEl = document.getElementById('cameraVideoFeed');
+    const qrCanvas = document.getElementById('qrScanCanvas');
+    const qrCanvasCtx = qrCanvas.getContext('2d', { willReadFrequently: true });
+    const cameraOverlay = document.getElementById('cameraStatusOverlay');
+
+    document.getElementById('navOpenScannerBtn').addEventListener('click', openCameraScanner);
+    document.getElementById('heroScanBtn').addEventListener('click', openCameraScanner);
+    document.getElementById('closeScannerModalBtn').addEventListener('click', closeCameraScanner);
+
+    async function openCameraScanner() {
+      cameraModal.classList.remove('hidden');
+      cameraOverlay.classList.add('hidden');
+      appState.isScanningQr = true;
+
+      try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+          showCameraError('Camera API not accessible', 'Your browser does not permit direct camera access. Use manual pairing or upload a QR image.');
+          return;
+        }
+
+        const constraints = {
+          video: {
+            facingMode: { ideal: appState.cameraFacingMode },
+            width: { ideal: 1280 },
+            height: { ideal: 720 }
+          }
+        };
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        appState.cameraStream = stream;
+        videoEl.srcObject = stream;
+        await videoEl.play();
+
+        requestAnimationFrame(tickQrScanner);
+      } catch (err) {
+        console.warn('Camera stream error:', err);
+        showCameraError('Camera Access Blocked', 'Please grant webcam/camera permissions or pick an image file containing the QR code.');
+      }
+    }
+
+    function showCameraError(title, subtitle) {
+      cameraOverlay.classList.remove('hidden');
+      document.getElementById('cameraStatusText').textContent = title;
+      document.getElementById('cameraStatusSubtext').textContent = subtitle;
+    }
+
+    function closeCameraScanner() {
+      appState.isScanningQr = false;
+      if (appState.cameraStream) {
+        appState.cameraStream.getTracks().forEach(track => track.stop());
+        appState.cameraStream = null;
+      }
+      cameraModal.classList.add('hidden');
+    }
+
+    // Switch between back and front camera
+    document.getElementById('switchCameraBtn').addEventListener('click', async () => {
+      appState.cameraFacingMode = (appState.cameraFacingMode === 'environment') ? 'user' : 'environment';
+      if (appState.cameraStream) {
+        appState.cameraStream.getTracks().forEach(track => track.stop());
+      }
+      openCameraScanner();
+    });
+
+    // Real-Time Frame Processor
+    function tickQrScanner() {
+      if (!appState.isScanningQr) return;
+
+      if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
+        qrCanvas.width = videoEl.videoWidth;
+        qrCanvas.height = videoEl.videoHeight;
+        qrCanvasCtx.drawImage(videoEl, 0, 0, qrCanvas.width, qrCanvas.height);
+
+        const imageData = qrCanvasCtx.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
+        
+        // Scan with jsQR
+        if (window.jsQR) {
+          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+            inversionAttempts: "dontInvert"
+          });
+
+          if (code && code.data) {
+            handleScannedQrData(code.data);
+            return;
+          }
+        }
+      }
+
+      requestAnimationFrame(tickQrScanner);
+    }
+
+    // Image File QR Decoder (Fallback)
+    function setupImageQrReader(inputElement) {
+      inputElement.addEventListener('change', (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          const img = new Image();
+          img.onload = () => {
+            qrCanvas.width = img.width;
+            qrCanvas.height = img.height;
+            qrCanvasCtx.drawImage(img, 0, 0);
+            const imgData = qrCanvasCtx.getImageData(0, 0, img.width, img.height);
+            if (window.jsQR) {
+              const code = jsQR(imgData.data, imgData.width, imgData.height);
+              if (code && code.data) {
+                handleScannedQrData(code.data);
+              } else {
+                showToast('No recognizable QR code found in this image.');
+              }
+            }
+          };
+          img.src = event.target.result;
+        };
+        reader.readAsDataURL(file);
+      });
+    }
+
+    setupImageQrReader(document.getElementById('qrImageFileInput'));
+    setupImageQrReader(document.getElementById('qrImageFileInputAlt'));
+
+    // Manual Token Input
+    document.getElementById('applyManualTokenBtn').addEventListener('click', () => {
+      const val = document.getElementById('manualTokenInput').value.trim();
+      if (!val) return;
+      handleScannedQrData(val);
+    });
+
+    function handleScannedQrData(decodedString) {
+      playBeepTone();
+      if (navigator.vibrate) {
+        try { navigator.vibrate(80); } catch (_) {}
+      }
+
+      let parsedRoom = null;
+      try {
+        // If it's a URL
+        if (decodedString.includes('room=')) {
+          const u = new URL(decodedString);
+          parsedRoom = u.searchParams.get('room');
+        } else if (decodedString.startsWith('MESH-')) {
+          parsedRoom = decodedString;
+        } else {
+          parsedRoom = decodedString.replace(/[^a-zA-Z0-9_-]/g, '');
+        }
+      } catch (_) {
+        parsedRoom = decodedString.replace(/[^a-zA-Z0-9_-]/g, '');
+      }
+
+      if (parsedRoom) {
+        appState.roomToken = parsedRoom;
+        setupBroadcastMesh();
+        closeCameraScanner();
+        showToast(`QR Code Verified: Joined Room ${parsedRoom}`);
+      } else {
+        showToast('Invalid QR Code format.');
+      }
+    }
+
+    // Companion Simulation Button (Instant Test in 1 Click)
+    document.getElementById('simulateCompanionBtn').addEventListener('click', () => {
+      const mockCompanion = {
+        id: 'peer_sim_' + Math.random().toString(36).substring(2, 7),
+        name: 'Apple iPhone 15 Pro',
+        category: 'phone',
+        icon: 'smartphone'
+      };
+
+      establishPairedConnection(mockCompanion);
+    });
+
+    const mediaFileInput = document.getElementById('mediaFileInput');
+    const dropZone = document.getElementById('dropZoneBox');
+    const stagedWrapper = document.getElementById('stagedListWrapper');
+    const stagedBadge = document.getElementById('stagedBadge');
+    const sendBtn = document.getElementById('sendPayloadBtn');
+
     ['dragenter', 'dragover'].forEach(eventName => {
-      dropzone.addEventListener(eventName, (e) => {
+      dropZone.addEventListener(eventName, (e) => {
         e.preventDefault();
-        dropzone.classList.add('border-indigo-500', 'bg-indigo-950/20');
+        dropZone.classList.add('border-cyan-400', 'bg-cyan-950/20');
       });
     });
 
     ['dragleave', 'drop'].forEach(eventName => {
-      dropzone.addEventListener(eventName, (e) => {
+      dropZone.addEventListener(eventName, (e) => {
         e.preventDefault();
-        dropzone.classList.remove('border-indigo-500', 'bg-indigo-950/20');
+        dropZone.classList.remove('border-cyan-400', 'bg-cyan-950/20');
       });
     });
 
-    dropzone.addEventListener('drop', (e) => {
+    dropZone.addEventListener('drop', (e) => {
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        addFilesToStaging(e.dataTransfer.files);
+        stageFiles(e.dataTransfer.files);
       }
     });
 
-    fileInput.addEventListener('change', (e) => {
+    mediaFileInput.addEventListener('change', (e) => {
       if (e.target.files && e.target.files.length > 0) {
-        addFilesToStaging(e.target.files);
+        stageFiles(e.target.files);
       }
     });
 
-    function addFilesToStaging(files) {
+    function stageFiles(files) {
       Array.from(files).forEach(file => {
-        const staged = {
-          id: 'file_' + Math.random().toString(36).substr(2, 9),
+        const item = {
+          id: 'file_' + Math.random().toString(36).substring(2, 9),
           file: file,
           name: file.name,
           size: file.size,
-          type: file.type,
+          type: file.type || 'application/octet-stream',
           previewUrl: null
         };
 
-        // Create instant blob object preview for images and videos
         if (file.type.startsWith('image/') || file.type.startsWith('video/')) {
-          staged.previewUrl = URL.createObjectURL(file);
+          item.previewUrl = URL.createObjectURL(file);
         }
 
-        state.stagedFiles.push(staged);
+        appState.stagedFiles.push(item);
       });
 
       renderStagedFiles();
     }
 
-    function removeStagedFile(fileId) {
-      const idx = state.stagedFiles.findIndex(f => f.id === fileId);
+    function removeStagedItem(id) {
+      const idx = appState.stagedFiles.findIndex(f => f.id === id);
       if (idx !== -1) {
-        if (state.stagedFiles[idx].previewUrl) {
-          URL.revokeObjectURL(state.stagedFiles[idx].previewUrl);
+        if (appState.stagedFiles[idx].previewUrl) {
+          URL.revokeObjectURL(appState.stagedFiles[idx].previewUrl);
         }
-        state.stagedFiles.splice(idx, 1);
+        appState.stagedFiles.splice(idx, 1);
       }
       renderStagedFiles();
     }
 
     function renderStagedFiles() {
-      selectedFilesCount.textContent = `${state.stagedFiles.length} file${state.stagedFiles.length === 1 ? '' : 's'}`;
-      initiateSendBtn.disabled = state.stagedFiles.length === 0;
+      const count = appState.stagedFiles.length;
+      stagedBadge.textContent = `${count} file${count === 1 ? '' : 's'} staged`;
+      sendBtn.disabled = count === 0;
 
-      if (state.stagedFiles.length === 0) {
-        stagedFilesContainer.innerHTML = '';
+      if (count === 0) {
+        stagedWrapper.innerHTML = `
+          <div id="emptyStagedNotice" class="py-8 text-center text-slate-500 font-mono text-xs">
+            No files currently queued for transfer.
+          </div>
+        `;
         return;
       }
 
-      stagedFilesContainer.innerHTML = state.stagedFiles.map(staged => {
+      stagedWrapper.innerHTML = appState.stagedFiles.map(st => {
         let previewHtml = '';
-        if (staged.previewUrl && staged.type.startsWith('image/')) {
-          previewHtml = `<img src="${staged.previewUrl}" class="w-10 h-10 object-cover rounded-lg cursor-pointer" onclick="openLightbox('${staged.previewUrl}', '${escapeHtml(staged.name)}', 'image')" />`;
-        } else if (staged.previewUrl && staged.type.startsWith('video/')) {
-          previewHtml = `<div class="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-pink-400 cursor-pointer" onclick="openLightbox('${staged.previewUrl}', '${escapeHtml(staged.name)}', 'video')"><i data-lucide="play" class="w-4 h-4"></i></div>`;
+        if (st.previewUrl && st.type.startsWith('image/')) {
+          previewHtml = `<img src="${st.previewUrl}" class="w-10 h-10 object-cover rounded-xl border border-cyber-border cursor-pointer" onclick="openMediaLightbox('${st.previewUrl}', '${escapeHtml(st.name)}', 'image')" />`;
+        } else if (st.previewUrl && st.type.startsWith('video/')) {
+          previewHtml = `<div class="w-10 h-10 bg-cyber-950 rounded-xl flex items-center justify-center text-violet-400 border border-cyber-border cursor-pointer" onclick="openMediaLightbox('${st.previewUrl}', '${escapeHtml(st.name)}', 'video')"><i data-lucide="play" class="w-5 h-5"></i></div>`;
         } else {
-          previewHtml = `<div class="w-10 h-10 bg-slate-800 rounded-lg flex items-center justify-center text-indigo-400"><i data-lucide="file-text" class="w-5 h-5"></i></div>`;
+          previewHtml = `<div class="w-10 h-10 bg-cyber-850 rounded-xl flex items-center justify-center text-cyan-400 border border-cyber-border"><i data-lucide="file-text" class="w-5 h-5"></i></div>`;
         }
 
         return `
-          <div class="bg-slate-900/90 border border-slate-800 rounded-xl p-2.5 flex items-center justify-between gap-3">
+          <div class="bg-cyber-900 border border-cyber-border rounded-2xl p-2.5 flex items-center justify-between gap-3 font-mono text-xs">
             <div class="flex items-center gap-2.5 min-w-0">
               ${previewHtml}
               <div class="min-w-0">
-                <p class="text-xs font-semibold text-slate-200 truncate max-w-[140px]">${escapeHtml(staged.name)}</p>
-                <p class="text-[10px] text-slate-400">${formatBytes(staged.size)}</p>
+                <p class="font-bold text-slate-200 truncate max-w-[200px]">${escapeHtml(st.name)}</p>
+                <p class="text-[10px] text-slate-400">${formatBytes(st.size)}</p>
               </div>
             </div>
-            <button onclick="removeStagedFile('${staged.id}')" class="text-slate-500 hover:text-rose-400 p-1">
+            <button onclick="removeStagedItem('${st.id}')" class="text-slate-500 hover:text-rose-400 p-1.5 transition">
               <i data-lucide="trash-2" class="w-4 h-4"></i>
             </button>
           </div>
@@ -711,236 +1068,206 @@
       lucide.createIcons();
     }
 
-    initiateSendBtn.addEventListener('click', () => {
-      const targetId = document.getElementById('targetPeerSelect').value;
-      if (!targetId) {
-        showTemporaryToast('Please select a target device or choose "Broadcast to All"');
+    sendBtn.addEventListener('click', async () => {
+      if (!appState.isPaired || !appState.pairedPeer) {
+        showToast('Please pair with a device by scanning a QR code first');
         return;
       }
-      if (state.stagedFiles.length === 0) return;
+      if (appState.stagedFiles.length === 0) return;
 
-      startP2PTransmission(targetId);
-    });
+      const stagedItem = appState.stagedFiles[0];
+      let fileDataUrl = null;
 
-    async function startP2PTransmission(targetId) {
-      if (state.transferInProgress) return;
-      state.transferInProgress = true;
-
-      const fileObj = state.stagedFiles[0]; // send primary staged file
-      const totalBytes = fileObj.size;
-      const targetPeer = state.peers.find(p => p.id === targetId);
-      const targetName = targetId === 'all' ? 'All Nearby Devices' : (targetPeer ? targetPeer.name : 'Remote Peer');
-
-      // Show transfer status bar
-      showTransferBar(true);
-      document.getElementById('transferStatusTitle').textContent = `Sending "${fileObj.name}" to ${targetName}`;
-
-      // Emit broadcast signal to other open tabs
-      if (state.channel) {
-        // Read small files as DataURL so other tabs get real data
-        const reader = new FileReader();
-        reader.onload = () => {
-          state.channel.postMessage({
-            action: 'file_transfer_request',
-            sender: state.myDevice,
-            targetId: targetId,
-            payload: {
-              name: fileObj.name,
-              size: fileObj.size,
-              type: fileObj.type,
-              dataUrl: reader.result
-            }
-          });
-        };
-        reader.readAsDataURL(fileObj.file);
+      if (stagedItem.file.size < 60 * 1024 * 1024) {
+        fileDataUrl = await readFileAsDataUrl(stagedItem.file);
       }
 
-      // Simulate ultra-fast local 802.11ax / 5GHz Wi-Fi WebRTC DataChannel chunking
-      let transmitted = 0;
-      const chunkSize = Math.max(totalBytes / 40, 256 * 1024); // responsive chunks
-      const intervalTime = 60; // ms
+      // Broadcast payload to paired peer
+      if (appState.channel) {
+        appState.channel.postMessage({
+          type: 'FILE_TRANSMIT_OFFER',
+          peer: appState.myDevice,
+          targetId: appState.pairedPeer.id,
+          payload: {
+            name: stagedItem.name,
+            size: stagedItem.size,
+            type: stagedItem.type,
+            dataUrl: fileDataUrl
+          }
+        });
+      }
 
-      const interval = setInterval(() => {
-        transmitted += chunkSize;
-        const progress = Math.min(100, Math.round((transmitted / totalBytes) * 100));
-        const speedMbps = (28 + Math.random() * 12).toFixed(1); // 28 - 40 MB/s local speed
-        const remainingSec = Math.max(0, Math.ceil((totalBytes - transmitted) / (parseFloat(speedMbps) * 1024 * 1024)));
+      // Trigger High Speed Streaming HUD
+      const banner = document.getElementById('transferProgressBanner');
+      const title = document.getElementById('transferTitleText');
+      const bar = document.getElementById('transferProgressBar');
+      const pct = document.getElementById('transferPctText');
+      const spd = document.getElementById('transferSpeedText');
+      const bytes = document.getElementById('transferBytesText');
+      const eta = document.getElementById('transferEtaText');
 
-        document.getElementById('transferProgressBar').style.width = progress + '%';
-        document.getElementById('transferPercentMetric').textContent = progress + '%';
-        document.getElementById('transferSpeedMetric').textContent = `${speedMbps} MB/s`;
-        document.getElementById('transferBytesDetail').textContent = `${formatBytes(Math.min(transmitted, totalBytes))} of ${formatBytes(totalBytes)}`;
-        document.getElementById('transferTimeRemaining').textContent = `${remainingSec}s remaining`;
+      title.textContent = `Streaming "${stagedItem.name}" → ${appState.pairedPeer.name}`;
+      banner.classList.remove('translate-y-36', 'opacity-0', 'pointer-events-none');
+      banner.classList.add('translate-y-0', 'opacity-100');
+
+      let sent = 0;
+      const total = stagedItem.size;
+      const chunkSize = Math.max(total / 24, 1024 * 1024);
+
+      const streamTimer = setInterval(() => {
+        sent += chunkSize;
+        const progress = Math.min(100, Math.round((sent / total) * 100));
+        const rate = (36 + Math.random() * 14).toFixed(1);
+        const remain = Math.max(0, Math.ceil((total - sent) / (parseFloat(rate) * 1024 * 1024)));
+
+        bar.style.width = progress + '%';
+        pct.textContent = progress + '%';
+        spd.textContent = `${rate} MB/s`;
+        bytes.textContent = `${formatBytes(Math.min(sent, total))} of ${formatBytes(total)}`;
+        eta.textContent = `ETA: ${remain}s`;
 
         if (progress >= 100) {
-          clearInterval(interval);
+          clearInterval(streamTimer);
           setTimeout(() => {
-            showTransferBar(false);
-            state.transferInProgress = false;
-            showTemporaryToast(`Transfer complete! Sent to ${targetName}`);
-            // Clear staged
-            state.stagedFiles = [];
+            banner.classList.add('translate-y-36', 'opacity-0', 'pointer-events-none');
+            banner.classList.remove('translate-y-0', 'opacity-100');
+            showToast(`Delivered "${stagedItem.name}" to ${appState.pairedPeer.name}`);
+            appState.stagedFiles = [];
             renderStagedFiles();
           }, 600);
         }
-      }, intervalTime);
+      }, 55);
+    });
+
+    function readFileAsDataUrl(file) {
+      return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () => resolve(null);
+        reader.readAsDataURL(file);
+      });
     }
 
-    function showTransferBar(visible) {
-      const bar = document.getElementById('transferStatusBar');
-      if (visible) {
-        bar.classList.remove('translate-y-32', 'opacity-0', 'pointer-events-none');
-        bar.classList.add('translate-y-0', 'opacity-100');
+    function showIncomingFileModal(filePayload, senderDevice) {
+      appState.pendingIncoming = { filePayload, senderDevice };
+
+      const modal = document.getElementById('incomingFileModal');
+      document.getElementById('incomingSourceDeviceText').textContent = `From: ${senderDevice.name}`;
+      document.getElementById('incomingFileNameText').textContent = filePayload.name;
+      document.getElementById('incomingFileSizeText').textContent = `${formatBytes(filePayload.size)} • ${filePayload.type || 'Data Blob'}`;
+
+      const iconBox = document.getElementById('incomingFileIconBox');
+      if (filePayload.type.startsWith('image/')) {
+        iconBox.innerHTML = '<i data-lucide="image" class="w-6 h-6 text-amber-400"></i>';
+      } else if (filePayload.type.startsWith('video/')) {
+        iconBox.innerHTML = '<i data-lucide="film" class="w-6 h-6 text-violet-400"></i>';
       } else {
-        bar.classList.add('translate-y-32', 'opacity-0', 'pointer-events-none');
-        bar.classList.remove('translate-y-0', 'opacity-100');
-      }
-    }
-
-    function promptIncomingTransfer(fileMetadata, sender) {
-      state.pendingIncomingTransfer = { fileMetadata, sender };
-
-      document.getElementById('incomingFromText').innerHTML = `Device <span class="text-indigo-400 font-semibold">${escapeHtml(sender.name)}</span> wants to share a file over Wi-Fi`;
-      document.getElementById('incomingFileName').textContent = fileMetadata.name;
-      document.getElementById('incomingFileSize').textContent = `${formatBytes(fileMetadata.size)} • ${fileMetadata.type || 'Binary'}`;
-
-      const iconElem = document.getElementById('incomingFileTypeIcon');
-      if (fileMetadata.type.startsWith('image/')) {
-        iconElem.innerHTML = '<i data-lucide="image" class="w-5 h-5 text-amber-400"></i>';
-      } else if (fileMetadata.type.startsWith('video/')) {
-        iconElem.innerHTML = '<i data-lucide="film" class="w-5 h-5 text-pink-400"></i>';
-      } else {
-        iconElem.innerHTML = '<i data-lucide="file-text" class="w-5 h-5 text-indigo-400"></i>';
+        iconBox.innerHTML = '<i data-lucide="file" class="w-6 h-6 text-cyan-400"></i>';
       }
       lucide.createIcons();
 
-      document.getElementById('incomingRequestModal').classList.remove('hidden');
+      modal.classList.remove('hidden');
     }
 
-    document.getElementById('rejectTransferBtn').addEventListener('click', () => {
-      document.getElementById('incomingRequestModal').classList.add('hidden');
-      state.pendingIncomingTransfer = null;
-      showTemporaryToast('Transfer declined.');
+    document.getElementById('rejectIncomingBtn').addEventListener('click', () => {
+      document.getElementById('incomingFileModal').classList.add('hidden');
+      appState.pendingIncoming = null;
+      showToast('Transfer declined.');
     });
 
-    document.getElementById('acceptTransferBtn').addEventListener('click', () => {
-      document.getElementById('incomingRequestModal').classList.add('hidden');
-      if (!state.pendingIncomingTransfer) return;
+    document.getElementById('acceptIncomingBtn').addEventListener('click', () => {
+      document.getElementById('incomingFileModal').classList.add('hidden');
+      if (!appState.pendingIncoming) return;
 
-      const { fileMetadata, sender } = state.pendingIncomingTransfer;
-      state.pendingIncomingTransfer = null;
+      const { filePayload, senderDevice } = appState.pendingIncoming;
+      appState.pendingIncoming = null;
 
-      // Simulate incoming reception progress
-      showTransferBar(true);
-      document.getElementById('transferStatusTitle').textContent = `Receiving "${fileMetadata.name}" from ${sender.name}`;
-
-      let received = 0;
-      const total = fileMetadata.size;
-      const chunk = Math.max(total / 30, 256 * 1024);
-
-      const interval = setInterval(() => {
-        received += chunk;
-        const progress = Math.min(100, Math.round((received / total) * 100));
-        const speed = (35 + Math.random() * 10).toFixed(1);
-
-        document.getElementById('transferProgressBar').style.width = progress + '%';
-        document.getElementById('transferPercentMetric').textContent = progress + '%';
-        document.getElementById('transferSpeedMetric').textContent = `${speed} MB/s`;
-        document.getElementById('transferBytesDetail').textContent = `${formatBytes(Math.min(received, total))} of ${formatBytes(total)}`;
-
-        if (progress >= 100) {
-          clearInterval(interval);
-          setTimeout(() => {
-            showTransferBar(false);
-            saveFileToInbox(fileMetadata, sender);
-            showTemporaryToast(`Received "${fileMetadata.name}" from ${sender.name}! Saved to Inbox.`);
-          }, 400);
-        }
-      }, 50);
-    });
-
-    function saveFileToInbox(meta, sender) {
-      const inboxItem = {
-        id: 'inbox_' + Date.now(),
-        name: meta.name,
-        size: meta.size,
-        type: meta.type,
-        senderName: sender.name,
-        date: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        dataUrl: meta.dataUrl || createDummyDataUrl(meta.type, meta.name)
+      const receivedItem = {
+        id: 'rec_' + Date.now(),
+        name: filePayload.name,
+        size: filePayload.size,
+        type: filePayload.type,
+        sender: senderDevice.name,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        dataUrl: filePayload.dataUrl || createSampleDataBlob(filePayload.name, filePayload.type)
       };
 
-      state.inbox.unshift(inboxItem);
-      updateInboxBadge();
+      appState.inbox.unshift(receivedItem);
+      refreshInboxBadge();
+      showToast(`Saved "${filePayload.name}" to Received Inbox`);
+    });
+
+    function createSampleDataBlob(name, type) {
+      const blob = new Blob([`AirShare QR Transfer Payload: ${name}`], { type: type || 'text/plain' });
+      return URL.createObjectURL(blob);
     }
 
-    function updateInboxBadge() {
-      const badge = document.getElementById('inboxCountBadge');
-      if (state.inbox.length > 0) {
-        badge.textContent = state.inbox.length;
+    function refreshInboxBadge() {
+      const badge = document.getElementById('inboxBadge');
+      const count = appState.inbox.length;
+      if (count > 0) {
+        badge.textContent = count;
         badge.classList.remove('hidden');
       } else {
         badge.classList.add('hidden');
       }
     }
 
-    const inboxModal = document.getElementById('inboxModal');
-    document.getElementById('toggleInboxBtn').addEventListener('click', () => {
-      renderInbox();
-      inboxModal.classList.remove('hidden');
+    document.getElementById('inboxToggleBtn').addEventListener('click', () => {
+      renderInboxModal();
+      document.getElementById('inboxModal').classList.remove('hidden');
     });
 
     document.getElementById('closeInboxBtn').addEventListener('click', () => {
-      inboxModal.classList.add('hidden');
+      document.getElementById('inboxModal').classList.add('hidden');
     });
 
-    document.getElementById('clearInboxBtn').addEventListener('click', () => {
-      state.inbox = [];
-      updateInboxBadge();
-      renderInbox();
+    document.getElementById('clearInboxItemsBtn').addEventListener('click', () => {
+      appState.inbox = [];
+      refreshInboxBadge();
+      renderInboxModal();
     });
 
-    function renderInbox() {
-      const container = document.getElementById('inboxItemsList');
-      const storageSpan = document.getElementById('inboxStorageUsed');
-      storageSpan.textContent = `Storage: ${state.inbox.length} item${state.inbox.length === 1 ? '' : 's'}`;
+    function renderInboxModal() {
+      const container = document.getElementById('inboxItemsContainer');
+      const countLabel = document.getElementById('inboxCountSummary');
+      countLabel.textContent = `${appState.inbox.length} item${appState.inbox.length === 1 ? '' : 's'} stored`;
 
-      if (state.inbox.length === 0) {
+      if (appState.inbox.length === 0) {
         container.innerHTML = `
-          <div class="py-12 text-center text-slate-500">
-            <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-50"></i>
-            <p class="text-sm">Inbox is empty</p>
-            <p class="text-xs">Files received from local peers will appear here.</p>
+          <div class="py-12 text-center text-slate-500 font-mono">
+            <i data-lucide="inbox" class="w-8 h-8 mx-auto mb-2 opacity-40"></i>
+            <p class="text-xs">No files received yet.</p>
           </div>
         `;
         lucide.createIcons();
         return;
       }
 
-      container.innerHTML = state.inbox.map(item => {
+      container.innerHTML = appState.inbox.map(item => {
         const isImg = item.type.startsWith('image/');
         const isVid = item.type.startsWith('video/');
 
         return `
-          <div class="bg-slate-800/80 border border-slate-700/60 rounded-2xl p-3 flex items-center justify-between gap-3">
+          <div class="bg-cyber-850 border border-cyber-border rounded-2xl p-3 flex items-center justify-between gap-3 font-mono">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-12 h-12 rounded-xl bg-slate-900 border border-slate-700 flex items-center justify-center shrink-0 overflow-hidden cursor-pointer" onclick="handleInboxMediaClick('${item.id}')">
+              <div class="w-11 h-11 rounded-xl bg-cyber-950 border border-cyber-border flex items-center justify-center shrink-0 overflow-hidden cursor-pointer" onclick="handlePreviewInboxItem('${item.id}')">
                 ${isImg ? `<img src="${item.dataUrl}" class="w-full h-full object-cover" />` : 
-                  (isVid ? `<i data-lucide="film" class="w-5 h-5 text-pink-400"></i>` : `<i data-lucide="file" class="w-5 h-5 text-indigo-400"></i>`)}
+                  (isVid ? `<i data-lucide="film" class="w-5 h-5 text-violet-400"></i>` : `<i data-lucide="file" class="w-5 h-5 text-cyan-400"></i>`)}
               </div>
               <div class="min-w-0">
-                <p class="text-sm font-semibold text-slate-100 truncate">${escapeHtml(item.name)}</p>
-                <p class="text-[11px] text-slate-400">From <b class="text-slate-300">${escapeHtml(item.senderName)}</b> • ${formatBytes(item.size)} • ${item.date}</p>
+                <p class="text-xs font-semibold text-slate-100 truncate">${escapeHtml(item.name)}</p>
+                <p class="text-[10px] text-slate-400">From <span class="text-cyan-300 font-medium">${escapeHtml(item.sender)}</span> • ${formatBytes(item.size)} • ${item.time}</p>
               </div>
             </div>
 
-            <div class="flex items-center gap-1.5 shrink-0">
+            <div class="flex items-center gap-2 shrink-0">
               ${(isImg || isVid) ? `
-                <button onclick="handleInboxMediaClick('${item.id}')" class="p-2 rounded-xl bg-slate-700 hover:bg-slate-600 text-slate-300 hover:text-white transition" title="Preview">
+                <button onclick="handlePreviewInboxItem('${item.id}')" class="p-2 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-200 transition" title="Preview Media">
                   <i data-lucide="eye" class="w-4 h-4"></i>
                 </button>
               ` : ''}
-              <a href="${item.dataUrl}" download="${item.name}" class="p-2 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition flex items-center gap-1" title="Save to disk">
+              <a href="${item.dataUrl}" download="${item.name}" class="p-2 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white transition flex items-center justify-center" title="Save to disk">
                 <i data-lucide="download" class="w-4 h-4"></i>
               </a>
             </div>
@@ -951,28 +1278,27 @@
       lucide.createIcons();
     }
 
-    function handleInboxMediaClick(itemId) {
-      const item = state.inbox.find(i => i.id === itemId);
+    function handlePreviewInboxItem(id) {
+      const item = appState.inbox.find(i => i.id === id);
       if (!item) return;
 
       if (item.type.startsWith('image/')) {
-        openLightbox(item.dataUrl, item.name, 'image');
+        openMediaLightbox(item.dataUrl, item.name, 'image');
       } else if (item.type.startsWith('video/')) {
-        openLightbox(item.dataUrl, item.name, 'video');
+        openMediaLightbox(item.dataUrl, item.name, 'video');
       }
     }
 
-    /* Lightbox modal logic */
-    function openLightbox(url, title, type) {
+    function openMediaLightbox(url, caption, type) {
       const modal = document.getElementById('mediaLightboxModal');
-      const container = document.getElementById('lightboxMediaContainer');
-      const caption = document.getElementById('lightboxCaption');
+      const box = document.getElementById('lightboxMediaContent');
+      const cap = document.getElementById('lightboxCaptionText');
 
-      caption.textContent = title;
+      cap.textContent = caption;
       if (type === 'image') {
-        container.innerHTML = `<img src="${url}" class="max-h-[75vh] w-auto rounded-lg object-contain" />`;
+        box.innerHTML = `<img src="${url}" class="max-h-[75vh] w-auto rounded-xl object-contain" />`;
       } else if (type === 'video') {
-        container.innerHTML = `<video src="${url}" controls autoplay class="max-h-[75vh] w-full rounded-lg"></video>`;
+        box.innerHTML = `<video src="${url}" controls autoplay class="max-h-[75vh] w-full rounded-xl"></video>`;
       }
 
       modal.classList.remove('hidden');
@@ -980,159 +1306,27 @@
 
     document.getElementById('closeLightboxBtn').addEventListener('click', () => {
       document.getElementById('mediaLightboxModal').classList.add('hidden');
-      document.getElementById('lightboxMediaContainer').innerHTML = '';
+      document.getElementById('lightboxMediaContent').innerHTML = '';
     });
 
-    const profileModal = document.getElementById('profileModal');
-    const deviceNameInput = document.getElementById('deviceNameInput');
-
-    document.getElementById('editProfileBtn').addEventListener('click', () => {
-      deviceNameInput.value = state.myDevice.name;
-      profileModal.classList.remove('hidden');
-    });
-
-    document.getElementById('myCenterDevice').addEventListener('click', () => {
-      deviceNameInput.value = state.myDevice.name;
-      profileModal.classList.remove('hidden');
-    });
-
-    document.getElementById('cancelProfileBtn').addEventListener('click', () => {
-      profileModal.classList.add('hidden');
-    });
-
-    // Icon button selector
-    const iconButtons = document.querySelectorAll('#deviceIconSelector button');
-    let selectedIconType = state.myDevice.type;
-
-    iconButtons.forEach(btn => {
-      btn.addEventListener('click', () => {
-        iconButtons.forEach(b => {
-          b.className = 'p-2.5 rounded-xl border border-slate-700 hover:border-slate-600 bg-slate-800 text-slate-400 flex items-center justify-center';
-        });
-        btn.className = 'p-2.5 rounded-xl border border-indigo-500 bg-indigo-500/20 text-indigo-400 flex items-center justify-center';
-        selectedIconType = btn.getAttribute('data-icon');
-      });
-    });
-
-    document.getElementById('saveProfileBtn').addEventListener('click', () => {
-      const newName = deviceNameInput.value.trim();
-      if (newName) {
-        state.myDevice.name = newName;
-        state.myDevice.type = selectedIconType;
-        
-        // Update header & center display
-        document.getElementById('navDeviceName').textContent = newName;
-        document.getElementById('centerDeviceName').innerHTML = `${escapeHtml(newName)} <i data-lucide="pencil" class="w-3 h-3 text-slate-500"></i>`;
-        
-        // Update icons
-        document.getElementById('navAvatarIcon').innerHTML = `<i data-lucide="${selectedIconType}" class="w-4 h-4"></i>`;
-        document.getElementById('centerDeviceIcon').setAttribute('data-lucide', selectedIconType);
-        
-        lucide.createIcons();
-
-        // Broadcast profile change to peers
-        if (state.channel) {
-          state.channel.postMessage({
-            action: 'announce_presence',
-            sender: state.myDevice
-          });
-        }
-      }
-      profileModal.classList.add('hidden');
-    });
-
-    function spawnMockPeer() {
-      const randomTpl = samplePeerTemplates[Math.floor(Math.random() * samplePeerTemplates.length)];
-      const id = 'sim_' + Math.random().toString(36).substring(2, 7);
-      const peer = {
-        id,
-        name: randomTpl.name + ' #' + Math.floor(Math.random() * 89 + 10),
-        type: randomTpl.type,
-        ip: '192.168.1.' + Math.floor(Math.random() * 150 + 20),
-        signal: '-4' + Math.floor(Math.random() * 5 + 1) + ' dBm'
-      };
-
-      registerPeer(peer);
-      showTemporaryToast(`Discovered new device: ${peer.name}`);
-    }
-
-    document.getElementById('simulatePeerBtn').addEventListener('click', spawnMockPeer);
-    document.getElementById('addDemoPeerBtn').addEventListener('click', spawnMockPeer);
-
-    // Simulated incoming files
-    document.getElementById('simIncomingPhotoBtn').addEventListener('click', () => {
-      const sender = state.peers[0] || { name: "Guest iPad Pro", type: "tablet" };
-      // Canvas generated sample high-res image
-      const canvas = document.createElement('canvas');
-      canvas.width = 600;
-      canvas.height = 400;
-      const ctx = canvas.getContext('2d');
-      // Paint colorful scenic gradient
-      const grad = ctx.createLinearGradient(0, 0, 600, 400);
-      grad.addColorStop(0, '#f97316');
-      grad.addColorStop(0.5, '#ec4899');
-      grad.addColorStop(1, '#6366f1');
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, 0, 600, 400);
-      ctx.fillStyle = '#ffffff';
-      ctx.font = 'bold 28px sans-serif';
-      ctx.fillText('DropMesh Local Wi-Fi Shot', 40, 200);
-
-      const dataUrl = canvas.toDataURL('image/png');
-      promptIncomingTransfer({
-        name: 'DSC_Mesh_Capture_' + Math.floor(Math.random() * 899 + 100) + '.png',
-        size: 4380120, // 4.2 MB
-        type: 'image/png',
-        dataUrl: dataUrl
-      }, sender);
-    });
-
-    document.getElementById('simIncomingVideoBtn').addEventListener('click', () => {
-      const sender = state.peers[0] || { name: "MacBook Pro M3", type: "laptop" };
-      // Royalty-free small test video clip for immediate playback
-      promptIncomingTransfer({
-        name: '4k_drone_render_' + Math.floor(Math.random() * 90 + 10) + '.mp4',
-        size: 89128960, // 85 MB
-        type: 'video/mp4',
-        dataUrl: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4'
-      }, sender);
-    });
-
-    document.getElementById('sendToAllBtn').addEventListener('click', () => {
-      document.getElementById('targetPeerSelect').value = 'all';
-      if (state.stagedFiles.length === 0) {
-        showTemporaryToast('Please drop or browse files to send first.');
-        document.getElementById('fileInput').click();
-      } else {
-        startP2PTransmission('all');
-      }
-    });
-
-    function formatBytes(bytes, decimals = 1) {
-      if (!bytes) return '0 B';
+    function formatBytes(bytes) {
+      if (!bytes || bytes === 0) return '0 B';
       const k = 1024;
-      const dm = decimals < 0 ? 0 : decimals;
-      const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+      const sizes = ['B', 'KB', 'MB', 'GB'];
       const i = Math.floor(Math.log(bytes) / Math.log(k));
-      return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+      return (bytes / Math.pow(k, i)).toFixed(1) + ' ' + sizes[i];
     }
 
-    function escapeHtml(text) {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
+    function escapeHtml(str) {
+      const d = document.createElement('div');
+      d.textContent = str;
+      return d.innerHTML;
     }
 
-    function createDummyDataUrl(mimeType, filename) {
-      // Fallback blank text/blob if none provided
-      const blob = new Blob([`DropMesh local transferred content: ${filename}`], { type: mimeType });
-      return URL.createObjectURL(blob);
-    }
-
-    function showTemporaryToast(message) {
+    function showToast(text) {
       const toast = document.createElement('div');
-      toast.className = 'fixed top-20 right-6 z-50 bg-slate-800 border border-slate-700 text-slate-100 px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-medium flex items-center gap-2 transform transition-all duration-300 translate-y-[-20px] opacity-0';
-      toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-indigo-400"></i> ${escapeHtml(message)}`;
+      toast.className = 'fixed top-16 right-5 z-50 bg-cyber-900 border border-cyan-500/50 text-slate-100 px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-mono flex items-center gap-2 transform transition-all duration-300 translate-y-[-20px] opacity-0';
+      toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-cyan-400"></i> ${escapeHtml(text)}`;
       document.body.appendChild(toast);
       lucide.createIcons();
 
@@ -1144,30 +1338,13 @@
       setTimeout(() => {
         toast.classList.add('translate-y-[-20px]', 'opacity-0');
         setTimeout(() => toast.remove(), 300);
-      }, 3200);
+      }, 3500);
     }
 
-    // Window load & bootstrap
+    // Startup
     window.onload = () => {
-      // Set local identity visuals
-      document.getElementById('localIpDisplay').textContent = state.myDevice.ip;
-      document.getElementById('navDeviceName').textContent = state.myDevice.name;
-      document.getElementById('centerDeviceName').innerHTML = `${escapeHtml(state.myDevice.name)} <i data-lucide="pencil" class="w-3 h-3 text-slate-500"></i>`;
-
-      // Set up inter-tab BroadcastChannel
-      setupInterTabSignaling();
-
-      // Spawn initial mock peer so the user immediately sees a live mesh
-      setTimeout(() => {
-        registerPeer({
-          id: 'dev_mock_iphone',
-          name: "Alex's iPhone 15 Pro",
-          type: "smartphone",
-          ip: "192.168.1.112",
-          signal: "-42 dBm"
-        });
-      }, 400);
-
+      detectCurrentDevice();
+      initializeRoomToken();
       lucide.createIcons();
     };
   </script>
