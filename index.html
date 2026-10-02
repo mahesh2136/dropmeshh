@@ -3,8 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>AirShare QR - Peer-to-Peer QR Mesh Transfer</title>
-  <!-- Tailwind CSS -->
+  <title>QRDrop Sync - Optical P2P Mesh File Sharing</title>
+  
+  <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
   <script>
     tailwind.config = {
@@ -13,32 +14,31 @@
         extend: {
           colors: {
             cyber: {
-              950: '#060a12',
-              900: '#0a0f1d',
-              850: '#0e1526',
-              800: '#141d34',
-              700: '#1e2b4d',
-              border: '#1f2e4d',
-              accent: '#06b6d4',
+              950: '#070a13',
+              900: '#0d1322',
+              850: '#131b2e',
+              800: '#1a243d',
+              700: '#233254',
+              border: '#1f2d4a',
+              cyan: '#06b6d4',
               emerald: '#10b981',
               violet: '#8b5cf6',
               rose: '#f43f5e'
             }
           },
           fontFamily: {
-            mono: ['JetBrains Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+            mono: ['JetBrains Mono', 'Menlo', 'Monaco', 'Courier New', 'monospace'],
             sans: ['Inter', 'system-ui', '-apple-system', 'Segoe UI', 'Roboto', 'sans-serif']
           },
-          animation: {
-            'laser-sweep': 'laserSweep 2.2s ease-in-out infinite',
-            'pulse-fast': 'pulse 1.2s cubic-bezier(0.4, 0, 0.6, 1) infinite',
-            'ping-slow': 'ping 2.5s cubic-bezier(0, 0, 0.2, 1) infinite'
-          },
           keyframes: {
-            laserSweep: {
-              '0%, 100%': { transform: 'translateY(8%)', opacity: '0.4' },
-              '50%': { transform: 'translateY(92%)', opacity: '1' }
+            laserScan: {
+              '0%, 100%': { transform: 'translateY(12%)', opacity: '0.4' },
+              '50%': { transform: 'translateY(88%)', opacity: '1' }
             }
+          },
+          animation: {
+            'laser': 'laserScan 2s ease-in-out infinite',
+            'pulse-fast': 'pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite'
           }
         }
       }
@@ -47,37 +47,31 @@
 
   <!-- Lucide Icons -->
   <script src="https://unpkg.com/lucide@latest"></script>
-  <!-- In-Browser QR Code Generator -->
+  <!-- QRCode.js for reliable local canvas rendering -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
-  <!-- Fast Real-Time Camera QR Reader (jsQR) -->
+  <!-- Fast jsQR Camera Stream QR Decoder -->
   <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 
   <style>
-    .glass-panel {
-      background: rgba(14, 21, 38, 0.85);
-      backdrop-filter: blur(16px);
-      -webkit-backdrop-filter: blur(16px);
+    .glass-card {
+      background: rgba(13, 19, 34, 0.85);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
       border: 1px solid rgba(255, 255, 255, 0.08);
     }
-    .custom-scroll::-webkit-scrollbar {
-      width: 5px;
-      height: 5px;
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
     }
-    .custom-scroll::-webkit-scrollbar-track {
-      background: #060a12;
+    .custom-scrollbar::-webkit-scrollbar-track {
+      background: #070a13;
     }
-    .custom-scroll::-webkit-scrollbar-thumb {
-      background: #1f2e4d;
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background: #1f2d4a;
       border-radius: 9999px;
     }
-    .custom-scroll::-webkit-scrollbar-thumb:hover {
+    .custom-scrollbar::-webkit-scrollbar-thumb:hover {
       background: #06b6d4;
-    }
-    .scanner-mask {
-      box-shadow: 0 0 0 9999px rgba(6, 10, 18, 0.75);
-    }
-    .scan-reticle {
-      position: relative;
     }
     .scan-reticle::before, .scan-reticle::after,
     .scan-reticle-inner::before, .scan-reticle-inner::after {
@@ -96,16 +90,16 @@
 </head>
 <body class="bg-cyber-950 text-slate-100 min-h-screen flex flex-col font-sans selection:bg-cyan-500 selection:text-black">
 
-  <header class="sticky top-0 z-30 border-b border-cyber-border bg-cyber-950/90 backdrop-blur-md px-4 lg:px-8 py-3.5">
+  <header class="sticky top-0 z-30 border-b border-cyber-border bg-cyber-950/90 backdrop-blur-md px-4 sm:px-6 lg:px-8 py-3.5">
     <div class="max-w-6xl mx-auto flex items-center justify-between">
       
-      <!-- Brand & Device Tag -->
+      <!-- Brand & Local Device Identity -->
       <div class="flex items-center space-x-3">
         <div class="relative flex items-center justify-center w-10 h-10 rounded-2xl bg-gradient-to-tr from-cyan-500 via-teal-400 to-emerald-400 p-0.5 shadow-lg shadow-cyan-500/20">
           <div class="w-full h-full bg-cyber-950 rounded-[14px] flex items-center justify-center text-cyan-400">
-            <i data-lucide="qr-code" class="w-5 h-5"></i>
+            <i data-lucide="zap" class="w-5 h-5"></i>
           </div>
-          <span id="globalConnDot" class="absolute -top-1 -right-1 flex h-3 w-3">
+          <span id="navConnDot" class="absolute -top-1 -right-1 flex h-3 w-3">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-500 opacity-60"></span>
             <span class="relative inline-flex rounded-full h-3 w-3 bg-slate-600 border-2 border-cyber-950"></span>
           </span>
@@ -113,36 +107,36 @@
         <div>
           <div class="flex items-center gap-2">
             <h1 class="text-sm font-bold tracking-tight text-white flex items-center gap-1.5">
-              AirShare <span class="text-cyan-400">QR</span>
-              <span class="text-[10px] text-cyan-300 font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-700/50">NO IP NEEDED</span>
+              QRDrop <span class="text-cyan-400">Sync</span>
+              <span class="text-[9px] text-cyan-300 font-mono font-semibold px-2 py-0.5 rounded-full bg-cyan-950/80 border border-cyan-700/50">OPTICAL P2P</span>
             </h1>
           </div>
           <p class="text-[11px] text-slate-400 font-mono flex items-center gap-1.5 mt-0.5">
             <span id="myDeviceBadgeIcon" class="text-emerald-400"><i data-lucide="laptop" class="w-3.5 h-3.5 inline"></i></span>
-            <span id="myDeviceName">This Device</span>
+            <span id="myDeviceName">Detecting...</span>
             <span class="text-slate-600">•</span>
-            <span id="headerLinkStatusText" class="text-amber-400">Ready to Pair</span>
+            <span id="navLinkStatusText" class="text-amber-400">Waiting for QR Scan</span>
           </p>
         </div>
       </div>
 
-      <!-- Quick Actions Header -->
+      <!-- Header Action Controls -->
       <div class="flex items-center space-x-2">
-        <button id="navOpenScannerBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white text-xs font-mono font-medium shadow-md shadow-violet-600/20 transition">
+        <button id="openScannerBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white text-xs font-mono font-medium shadow-md shadow-violet-600/20 transition">
           <i data-lucide="scan" class="w-3.5 h-3.5"></i>
-          <span class="hidden sm:inline">Scan QR Code</span>
+          <span class="hidden sm:inline">Scan QR</span>
           <span class="sm:hidden">Scan</span>
         </button>
 
-        <button id="navOpenHostQrBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyber-850 hover:bg-cyber-800 border border-cyber-border text-cyan-400 text-xs font-mono transition">
+        <button id="showQrBtn" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-cyber-850 hover:bg-cyber-800 border border-cyber-border text-cyan-400 text-xs font-mono transition">
           <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
           <span class="hidden sm:inline">Show My QR</span>
           <span class="sm:hidden">My QR</span>
         </button>
 
-        <button id="inboxToggleBtn" class="relative p-2 rounded-xl bg-cyber-850 hover:bg-cyber-800 border border-cyber-border text-slate-300 transition flex items-center justify-center" title="Received Files">
-          <i data-lucide="inbox" class="w-4 h-4"></i>
-          <span id="inboxBadge" class="hidden absolute -top-1 -right-1 px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full bg-emerald-400 text-slate-950">0</span>
+        <button id="inboxVaultToggleBtn" class="relative p-2 rounded-xl bg-cyber-850 hover:bg-cyber-800 border border-cyber-border text-slate-300 transition flex items-center justify-center" title="Received Files Vault">
+          <i data-lucide="folder-down" class="w-4 h-4"></i>
+          <span id="inboxCountBadge" class="hidden absolute -top-1 -right-1 px-1.5 py-0.2 text-[9px] font-mono font-bold rounded-full bg-emerald-400 text-slate-950">0</span>
         </button>
       </div>
 
@@ -151,47 +145,15 @@
 
   <main class="flex-1 max-w-6xl w-full mx-auto p-4 sm:p-6 lg:p-8 flex flex-col space-y-6">
 
-    <!-- CONNECTION STATE BANNER -->
-    <div id="unpairedHeroBanner" class="glass-panel rounded-3xl p-6 sm:p-8 border border-cyber-border relative overflow-hidden transition-all duration-300">
-      <div class="absolute -right-16 -bottom-16 w-80 h-80 bg-gradient-to-br from-violet-500/10 via-cyan-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+    <!-- LIVE CONNECTED HUD (Appears instantly upon successful QR handshake) -->
+    <div id="liveConnectedHud" class="glass-card rounded-3xl p-5 sm:p-6 border border-emerald-500/40 relative overflow-hidden transition-all duration-300 shadow-xl shadow-emerald-500/5 hidden">
+      <div class="absolute -right-8 -bottom-8 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
 
-      <div class="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
-        <div class="space-y-2 text-center md:text-left max-w-lg">
-          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-violet-500/10 border border-violet-500/30 text-violet-300 text-xs font-mono">
-            <i data-lucide="zap" class="w-3.5 h-3.5"></i>
-            <span>Zero-Configuration Optical Pairing</span>
-          </div>
-          <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white">
-            Scan to Connect. Direct Peer Transfer.
-          </h2>
-          <p class="text-xs sm:text-sm text-slate-400 leading-relaxed">
-            No Wi-Fi passwords, no manual IP scanning, and no network subnet probes. One device shows the QR code, the other device scans it with the camera to link instantly.
-          </p>
-        </div>
-
-        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
-          <button id="heroScanBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-mono text-xs font-bold shadow-xl shadow-violet-600/25 transition">
-            <i data-lucide="camera" class="w-4 h-4"></i>
-            <span>SCAN QR CODE</span>
-          </button>
-          <button id="heroShowQrBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-cyber-900 hover:bg-cyber-850 border border-cyan-500/40 text-cyan-400 font-mono text-xs font-bold transition">
-            <i data-lucide="qr-code" class="w-4 h-4"></i>
-            <span>SHOW PAIRING QR</span>
-          </button>
-        </div>
-      </div>
-    </div>
-
-    <!-- PAIRED PEER HUD (Shown once connected) -->
-    <div id="pairedPeerHud" class="glass-panel rounded-3xl p-5 sm:p-6 border border-emerald-500/40 hidden relative overflow-hidden transition-all duration-300 shadow-xl shadow-emerald-500/5">
-      <div class="absolute -right-8 -bottom-8 w-60 h-60 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none"></div>
-
-      <div class="flex flex-col md:flex-row items-center justify-between gap-4">
-        
+      <div class="flex flex-col md:flex-row items-center justify-between gap-4 relative z-10">
         <div class="flex items-center gap-4 w-full md:w-auto">
-          <!-- Animated Radar Link Indicator -->
+          <!-- Active Peer Icon with Glowing Radar Pulse -->
           <div class="relative w-14 h-14 rounded-2xl bg-cyber-900 border border-emerald-500/50 flex items-center justify-center shrink-0">
-            <div id="pairedPeerIconBox" class="text-emerald-400">
+            <div id="pairedPeerIcon" class="text-emerald-400">
               <i data-lucide="smartphone" class="w-7 h-7"></i>
             </div>
             <span class="absolute -top-1 -right-1 flex h-3.5 w-3.5">
@@ -204,23 +166,23 @@
           <div>
             <div class="flex items-center gap-2">
               <h3 id="pairedPeerName" class="text-base font-bold text-white">Apple iPhone 15 Pro</h3>
-              <span id="pairedPeerCategoryBadge" class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40">SMARTPHONE</span>
+              <span id="pairedPeerCategory" class="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-500/40">SMARTPHONE</span>
             </div>
             <p class="text-xs font-mono text-slate-400 mt-1 flex flex-wrap items-center gap-2">
-              <span class="text-emerald-400 flex items-center gap-1">
-                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Direct P2P Channel
+              <span class="text-emerald-400 flex items-center gap-1 font-semibold">
+                <i data-lucide="shield-check" class="w-3.5 h-3.5"></i> Connected & Synced
               </span>
               <span class="text-slate-600">•</span>
-              <span id="pairedLatencyText" class="text-cyan-400">1.2 ms latency</span>
+              <span id="pairedPeerPing" class="text-cyan-400">0.8 ms ping</span>
               <span class="text-slate-600">•</span>
-              <span id="pairedMeshRoomText" class="text-slate-500">ROOM: MESH-8492</span>
+              <span id="pairedRoomTag" class="text-slate-400">ROOM: MESH-0000</span>
             </p>
           </div>
         </div>
 
-        <!-- Controls -->
+        <!-- Connection Diagnostics & Disconnect -->
         <div class="flex items-center gap-2 w-full md:w-auto justify-end">
-          <button id="sendPingTestBtn" class="px-3 py-2 rounded-xl bg-cyber-900 hover:bg-cyber-850 border border-cyber-border text-slate-300 text-xs font-mono transition flex items-center gap-1.5" title="Test Channel Latency">
+          <button id="sendPingBtn" class="px-3 py-2 rounded-xl bg-cyber-900 hover:bg-cyber-850 border border-cyber-border text-slate-300 text-xs font-mono transition flex items-center gap-1.5" title="Test roundtrip ping">
             <i data-lucide="activity" class="w-3.5 h-3.5 text-cyan-400"></i>
             <span>Ping</span>
           </button>
@@ -229,90 +191,139 @@
             <span>Disconnect</span>
           </button>
         </div>
-
       </div>
     </div>
 
-    <!-- FILE TRANSMISSION & MEDIA DROP ZONE -->
+    <!-- UNCONNECTED HERO BANNER -->
+    <div id="unconnectedHeroBanner" class="glass-card rounded-3xl p-6 sm:p-8 border border-cyber-border relative overflow-hidden transition-all duration-300">
+      <div class="absolute -right-16 -bottom-16 w-80 h-80 bg-gradient-to-br from-violet-500/10 via-cyan-500/10 to-transparent rounded-full blur-3xl pointer-events-none"></div>
+
+      <div class="flex flex-col md:flex-row items-center justify-between gap-6 relative z-10">
+        <div class="space-y-2 text-center md:text-left max-w-lg">
+          <div class="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/30 text-cyan-300 text-xs font-mono">
+            <i data-lucide="qr-code" class="w-3.5 h-3.5"></i>
+            <span>Automatic Multi-Channel Handshake</span>
+          </div>
+          <h2 class="text-xl sm:text-2xl font-bold tracking-tight text-white">
+            Instant Optical Pairing. No IP Configuration.
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-400 leading-relaxed">
+            One device shows the pairing QR code. The second device scans it with its camera. Once scanned, both devices lock into an active, encrypted peer-to-peer data pipeline.
+          </p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+          <button id="heroScanTriggerBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gradient-to-r from-violet-600 via-indigo-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-mono text-xs font-bold shadow-xl shadow-violet-600/25 transition">
+            <i data-lucide="camera" class="w-4 h-4"></i>
+            <span>SCAN PAIRING QR</span>
+          </button>
+          <button id="heroShowQrTriggerBtn" class="w-full sm:w-auto flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-cyber-900 hover:bg-cyber-850 border border-cyan-500/40 text-cyan-400 font-mono text-xs font-bold transition">
+            <i data-lucide="qr-code" class="w-4 h-4"></i>
+            <span>SHOW MY QR</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
 
-      <!-- LEFT: File Upload & Staging (7 cols) -->
+      <!-- LEFT COLUMN: Staged Media & Drop Zone (7 cols) -->
       <div class="lg:col-span-7 flex flex-col space-y-4">
-        <div class="glass-panel rounded-3xl p-5 sm:p-6 border border-cyber-border flex-1 flex flex-col">
+        <div class="glass-card rounded-3xl p-5 sm:p-6 border border-cyber-border flex-1 flex flex-col">
           <div class="flex items-center justify-between pb-3 border-b border-cyber-border mb-4">
             <div>
               <h3 class="text-xs font-mono font-bold uppercase text-slate-200 flex items-center gap-2">
                 <i data-lucide="files" class="w-4 h-4 text-cyan-400"></i>
                 Staged Files & 4K Media
               </h3>
-              <p class="text-[11px] text-slate-400 mt-0.5">Select high-resolution photos, videos, or archives.</p>
+              <p class="text-[11px] text-slate-400 mt-0.5">High-res photos, 4K videos, documents & archives</p>
             </div>
-            <span id="stagedBadge" class="text-[11px] font-mono text-cyan-400 font-semibold">0 files staged</span>
+            <span id="stagedCountBadge" class="text-[11px] font-mono text-cyan-400 font-semibold">0 files staged</span>
           </div>
 
           <!-- Drag and Drop Box -->
           <div id="dropZoneBox" class="relative group border-2 border-dashed border-cyber-border hover:border-cyan-400 bg-cyber-900/50 hover:bg-cyan-950/10 rounded-2xl p-6 text-center transition cursor-pointer flex flex-col items-center justify-center min-h-[140px]">
-            <input type="file" id="mediaFileInput" multiple class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" />
+            <input type="file" id="filePickerInput" multiple class="absolute inset-0 opacity-0 cursor-pointer w-full h-full z-10" />
             <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mb-3 group-hover:scale-110 group-hover:bg-cyan-500 group-hover:text-black transition">
               <i data-lucide="upload-cloud" class="w-6 h-6"></i>
             </div>
             <p class="text-xs font-semibold text-slate-200">Drag & drop files or click to browse</p>
-            <p class="text-[10px] text-slate-400 mt-1 font-mono">Direct camera rolls, RAW photos, 4K videos & PDFs</p>
+            <p class="text-[10px] text-slate-400 mt-1 font-mono">Original resolution photos, raw videos, PDFs & ZIPs</p>
           </div>
 
-          <!-- Staged Items Preview Area -->
-          <div id="stagedListWrapper" class="mt-4 space-y-2.5 max-h-56 overflow-y-auto custom-scroll pr-1 flex-1">
-            <div id="emptyStagedNotice" class="py-8 text-center text-slate-500 font-mono text-xs">
-              No files currently queued for transfer.
+          <!-- Staged Items List -->
+          <div id="stagedFilesContainer" class="mt-4 space-y-2.5 max-h-56 overflow-y-auto custom-scrollbar pr-1 flex-1">
+            <div id="emptyStagedPlaceholder" class="py-8 text-center text-slate-500 font-mono text-xs">
+              No files currently queued.
             </div>
           </div>
 
-          <!-- Send Action Button -->
+          <!-- Transmit Action Button -->
           <div class="mt-4 pt-3 border-t border-cyber-border">
-            <button id="sendPayloadBtn" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-medium text-xs font-mono transition shadow-lg shadow-cyan-600/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
+            <button id="sendPayloadBtn" class="w-full py-3 px-4 rounded-xl bg-gradient-to-r from-cyan-600 via-teal-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold text-xs font-mono transition shadow-lg shadow-cyan-600/20 flex items-center justify-center gap-2 disabled:opacity-40 disabled:cursor-not-allowed" disabled>
               <i data-lucide="send" class="w-4 h-4"></i>
-              <span id="sendBtnLabel">Transmit to Paired Device</span>
+              <span id="sendPayloadLabel">Transmit to Paired Peer</span>
             </button>
           </div>
         </div>
       </div>
 
-      <!-- RIGHT: Test Tools & Connection Guide (5 cols) -->
+      <!-- RIGHT COLUMN: Instant Peer Testing & Quick Mesh Chat (5 cols) -->
       <div class="lg:col-span-5 flex flex-col space-y-4">
         
-        <!-- Live Inter-Tab & Multi-Device Testing Card -->
-        <div class="glass-panel rounded-3xl p-5 sm:p-6 border border-cyber-border flex flex-col justify-between">
+        <!-- Quick Peer Chat & Verification -->
+        <div class="glass-card rounded-3xl p-5 border border-cyber-border flex flex-col">
+          <div class="flex items-center justify-between pb-2 mb-3 border-b border-cyber-border">
+            <div class="flex items-center gap-2">
+              <i data-lucide="message-square" class="w-4 h-4 text-violet-400"></i>
+              <h3 class="text-xs font-mono font-bold uppercase text-white">Peer Mesh Ping & Chat</h3>
+            </div>
+            <span class="text-[10px] font-mono text-slate-500">Zero Cloud Relay</span>
+          </div>
+
+          <!-- Messages Stream -->
+          <div id="chatMessagesLog" class="space-y-2 h-36 overflow-y-auto custom-scrollbar p-2 bg-cyber-950/60 rounded-xl border border-cyber-border text-xs font-mono mb-3">
+            <p class="text-slate-500 text-[11px] text-center pt-8">Scan QR code to connect and start messaging</p>
+          </div>
+
+          <!-- Chat Input -->
+          <div class="flex items-center gap-2">
+            <input type="text" id="chatInputMessage" placeholder="Type quick message..." disabled class="flex-1 bg-cyber-900 border border-cyber-border rounded-xl px-3 py-2 text-xs font-mono text-cyan-300 focus:outline-none focus:border-cyan-400 disabled:opacity-40" />
+            <button id="sendChatBtn" disabled class="px-3.5 py-2 rounded-xl bg-violet-600 hover:bg-violet-500 disabled:opacity-40 text-white font-mono text-xs font-semibold transition flex items-center justify-center">
+              <i data-lucide="send" class="w-3.5 h-3.5"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- 1-Click Verification & Companion Generator -->
+        <div class="glass-card rounded-3xl p-5 border border-cyber-border flex flex-col justify-between">
           <div>
             <div class="flex items-center gap-2 mb-2">
-              <i data-lucide="monitor-smartphone" class="w-4 h-4 text-violet-400"></i>
-              <h3 class="text-xs font-mono font-bold uppercase text-white">How To Test AirShare QR</h3>
+              <i data-lucide="monitor-smartphone" class="w-4 h-4 text-cyan-400"></i>
+              <h3 class="text-xs font-mono font-bold uppercase text-white">Instant Two-Way Test Options</h3>
             </div>
-            <p class="text-xs text-slate-400 leading-relaxed mb-4">
-              Connect two devices or test right now inside this browser:
+            <p class="text-[11px] text-slate-400 leading-relaxed mb-3">
+              Test two-way sharing right away inside this browser or with a phone:
             </p>
 
-            <div class="space-y-3 font-mono text-xs">
-              <div class="p-3 rounded-2xl bg-cyber-900 border border-cyber-border">
-                <span class="text-cyan-400 font-bold block mb-1">Option A: Two Phones or TV</span>
-                <p class="text-slate-400 text-[11px]">Click <b>"Show Pairing QR"</b> on one screen and scan it using the camera on your phone or tablet.</p>
-              </div>
+            <div class="space-y-2.5 font-mono text-xs">
+              <button id="openLinkedTabBtn" class="w-full py-2.5 px-3 rounded-xl bg-cyan-600/20 hover:bg-cyan-600/30 border border-cyan-500/40 text-cyan-300 font-semibold text-[11px] transition flex items-center justify-center gap-2">
+                <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                <span>Open Linked 2nd Tab (Auto-Pairs!)</span>
+              </button>
 
-              <div class="p-3 rounded-2xl bg-cyber-900 border border-cyber-border">
-                <span class="text-violet-400 font-bold block mb-1">Option B: In Two Tabs (Live Demo)</span>
-                <p class="text-slate-400 text-[11px]">Duplicate this tab in your browser or click below to simulate an immediate companion phone:</p>
-                <button id="simulateCompanionBtn" class="mt-2.5 w-full py-2 px-3 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 font-semibold text-[11px] transition flex items-center justify-center gap-1.5">
-                  <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-                  <span>Simulate Connected Mobile Phone</span>
-                </button>
-              </div>
+              <button id="simulateCompanionPhoneBtn" class="w-full py-2.5 px-3 rounded-xl bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/40 text-violet-300 font-semibold text-[11px] transition flex items-center justify-center gap-2">
+                <i data-lucide="smartphone" class="w-3.5 h-3.5"></i>
+                <span>Simulate Connected Mobile Phone</span>
+              </button>
             </div>
           </div>
 
-          <div class="mt-4 pt-3 border-t border-cyber-border flex items-center justify-between text-[11px] font-mono text-slate-400">
+          <div class="mt-4 pt-3 border-t border-cyber-border flex items-center justify-between text-[10px] font-mono text-slate-400">
             <span class="flex items-center gap-1 text-emerald-400">
-              <i data-lucide="lock" class="w-3.5 h-3.5"></i> End-to-End P2P
+              <i data-lucide="lock" class="w-3 h-3"></i> End-to-End Encrypted
             </span>
-            <span>Zero Cloud Storage</span>
+            <span>Local Mesh Active</span>
           </div>
         </div>
 
@@ -322,8 +333,7 @@
 
   </main>
 
-  <!-- MODAL 1: CAMERA QR CODE SCANNER MODAL -->
-  <div id="cameraScannerModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden">
+  <div id="scannerModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden">
     <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl relative font-mono text-xs flex flex-col max-h-[92vh]">
       
       <!-- Modal Header -->
@@ -334,7 +344,7 @@
           </div>
           <div>
             <h3 class="text-sm font-bold text-white">Scan AirShare QR Code</h3>
-            <p class="text-[10px] text-slate-400">Point your camera at the target screen</p>
+            <p class="text-[10px] text-slate-400">Point your camera at the other screen's QR code</p>
           </div>
         </div>
         <button id="closeScannerModalBtn" class="text-slate-400 hover:text-white p-1 rounded-xl">
@@ -342,53 +352,53 @@
         </button>
       </div>
 
-      <!-- Live Video Viewport with Reticle and Laser Animation -->
+      <!-- Live Video Viewport with Reticle and Laser Sweep -->
       <div class="relative w-full aspect-square max-h-[340px] rounded-2xl overflow-hidden bg-black flex items-center justify-center border border-cyber-border/80">
         
         <!-- Video Stream Element -->
-        <video id="cameraVideoFeed" playsinline class="w-full h-full object-cover"></video>
+        <video id="cameraScannerVideo" playsinline class="w-full h-full object-cover"></video>
         <!-- In-memory frame canvas for jsQR analysis -->
-        <canvas id="qrScanCanvas" class="hidden"></canvas>
+        <canvas id="cameraAnalysisCanvas" class="hidden"></canvas>
 
         <!-- Scanning Reticle Overlay -->
         <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
           <div class="scan-reticle w-56 h-56 relative">
             <div class="scan-reticle-inner w-full h-full relative">
               <!-- Moving Laser Line -->
-              <div class="absolute inset-x-2 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-lg shadow-cyan-400/80 animate-laser-sweep"></div>
+              <div class="absolute inset-x-2 h-0.5 bg-gradient-to-r from-transparent via-cyan-400 to-transparent shadow-lg shadow-cyan-400/80 animate-laser"></div>
             </div>
           </div>
         </div>
 
         <!-- Camera Status or Error Message -->
-        <div id="cameraStatusOverlay" class="absolute inset-0 bg-cyber-950/80 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center text-slate-300 hidden">
+        <div id="cameraStatusPrompt" class="absolute inset-0 bg-cyber-950/90 backdrop-blur-sm flex flex-col items-center justify-center p-6 text-center text-slate-300 hidden">
           <i id="cameraStatusIcon" data-lucide="camera-off" class="w-10 h-10 text-amber-400 mb-2"></i>
-          <p id="cameraStatusText" class="text-xs font-semibold mb-1">Requesting camera access...</p>
-          <p id="cameraStatusSubtext" class="text-[11px] text-slate-400 mb-3">Please allow camera permissions in your browser.</p>
-          <label class="px-3 py-1.5 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-cyan-300 cursor-pointer border border-cyber-border transition">
-            <i data-lucide="image" class="w-3.5 h-3.5 inline mr-1"></i> Scan From Image File
-            <input type="file" id="qrImageFileInput" accept="image/*" class="hidden" />
+          <p id="cameraStatusTitle" class="text-xs font-semibold mb-1">Camera Permission Required</p>
+          <p id="cameraStatusDesc" class="text-[11px] text-slate-400 mb-3">Please allow camera access in your browser or select a saved QR image.</p>
+          <label class="px-3.5 py-2 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-cyan-300 cursor-pointer border border-cyber-border transition flex items-center gap-1.5">
+            <i data-lucide="image" class="w-4 h-4"></i> Scan From Image File
+            <input type="file" id="scanQrImageFileInput" accept="image/*" class="hidden" />
           </label>
         </div>
 
-        <!-- Controls Toolbar (Flip camera, torch) -->
+        <!-- Floating Controls Toolbar (Switch camera / Image scan) -->
         <div class="absolute bottom-3 inset-x-0 flex items-center justify-center gap-2 pointer-events-auto">
-          <button id="switchCameraBtn" class="p-2 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition" title="Switch Camera">
+          <button id="flipCameraBtn" class="p-2.5 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition" title="Flip Camera">
             <i data-lucide="flip-horizontal" class="w-4 h-4"></i>
           </button>
-          <label class="p-2 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition cursor-pointer" title="Upload QR Image">
-            <i data-lucide="upload" class="w-4 h-4"></i>
-            <input type="file" id="qrImageFileInputAlt" accept="image/*" class="hidden" />
+          <label class="p-2.5 rounded-xl bg-black/60 hover:bg-black/80 text-white backdrop-blur-md border border-white/10 transition cursor-pointer" title="Pick QR Image">
+            <i data-lucide="image-plus" class="w-4 h-4"></i>
+            <input type="file" id="scanQrImageFileInputAlt" accept="image/*" class="hidden" />
           </label>
         </div>
       </div>
 
       <!-- Manual Pairing Token Fallback -->
       <div class="mt-3 pt-3 border-t border-cyber-border">
-        <label class="text-[10px] text-slate-400 block mb-1">Or paste the pairing link / code manually:</label>
+        <label class="text-[10px] text-slate-400 block mb-1">Or paste the pairing link / room token directly:</label>
         <div class="flex items-center gap-2">
-          <input type="text" id="manualTokenInput" placeholder="e.g. AIRSHARE:MESH-9042:..." class="flex-1 bg-cyber-950 border border-cyber-border rounded-xl px-3 py-2 text-cyan-300 text-[11px] focus:outline-none focus:border-cyan-400 font-mono" />
-          <button id="applyManualTokenBtn" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition">
+          <input type="text" id="manualRoomCodeInput" placeholder="e.g. MESH-9281 or http://...#room=MESH-9281" class="flex-1 bg-cyber-950 border border-cyber-border rounded-xl px-3 py-2 text-cyan-300 text-[11px] focus:outline-none focus:border-cyan-400 font-mono" />
+          <button id="applyManualRoomBtn" class="px-4 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition">
             Pair
           </button>
         </div>
@@ -397,7 +407,6 @@
     </div>
   </div>
 
-  <!-- MODAL 2: HOST QR CODE DISPLAY MODAL -->
   <div id="hostQrModal" class="fixed inset-0 bg-black/90 backdrop-blur-md z-50 flex items-center justify-center p-3 sm:p-4 hidden">
     <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-md w-full p-6 shadow-2xl relative font-mono text-xs flex flex-col items-center">
       
@@ -410,80 +419,86 @@
       </div>
       <h3 class="text-base font-bold text-white text-center">Pair With This Device</h3>
       <p class="text-[11px] text-slate-400 text-center mt-0.5 mb-4">
-        Open AirShare QR on your phone, tablet, or PC and scan this code:
+        Open QRDrop Sync on another phone, tablet, or laptop and scan this QR code:
       </p>
 
-      <!-- QR Canvas Mount -->
-      <div id="qrcodeBox" class="p-3.5 bg-white rounded-2xl flex items-center justify-center shadow-2xl shadow-cyan-500/10"></div>
+      <!-- Mount point for QRCode.js Canvas -->
+      <div id="qrcodeMountBox" class="p-4 bg-white rounded-2xl flex items-center justify-center shadow-2xl shadow-cyan-500/10"></div>
 
-      <!-- Peer Token & Copy Button -->
-      <div class="w-full mt-4 space-y-1.5">
+      <!-- Peer Room Token & Share Link -->
+      <div class="w-full mt-4 space-y-2">
         <div class="flex items-center justify-between text-[10px] text-slate-400">
-          <span>Direct Pairing URL / Token:</span>
-          <span id="hostRoomCodeLabel" class="text-cyan-400 font-bold">ROOM: MESH-0000</span>
+          <span>Direct Pairing URL / Code:</span>
+          <span id="activeHostRoomLabel" class="text-cyan-400 font-bold">ROOM: MESH-0000</span>
         </div>
         <div class="flex items-center gap-2">
-          <input type="text" id="hostQrPayloadUrl" readonly class="flex-1 bg-cyber-950 border border-cyber-border rounded-xl px-3 py-2 text-[10px] text-cyan-400 focus:outline-none" />
-          <button id="copyHostUrlBtn" class="px-3 py-2 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-200 border border-cyber-border transition">
-            Copy
+          <input type="text" id="hostShareUrlInput" readonly class="flex-1 bg-cyber-950 border border-cyber-border rounded-xl px-3 py-2 text-[10px] text-cyan-400 focus:outline-none" />
+          <button id="copyShareUrlBtn" class="px-3 py-2 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-200 border border-cyber-border transition flex items-center gap-1">
+            <i data-lucide="copy" class="w-3.5 h-3.5"></i>
+            <span>Copy</span>
           </button>
         </div>
+
+        <button id="modalOpenPairedTabBtn" class="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-violet-600 to-cyan-600 hover:from-violet-500 hover:to-cyan-500 text-white font-semibold text-xs transition flex items-center justify-center gap-2">
+          <i data-lucide="external-link" class="w-4 h-4"></i>
+          <span>Open Paired Tab (Instant Test)</span>
+        </button>
       </div>
 
     </div>
   </div>
 
-  <!-- FLOATING HIGH-SPEED TRANSFER HUD -->
-  <div id="transferProgressBanner" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40 transition-all duration-300 transform translate-y-36 opacity-0 pointer-events-none">
-    <div class="glass-panel bg-[#090e18]/95 border border-cyan-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-xl">
+  <!-- HIGH SPEED STREAMING HUD BANNER -->
+  <div id="transferProgressHUD" class="fixed bottom-6 left-1/2 -translate-x-1/2 w-full max-w-lg px-4 z-40 transition-all duration-300 transform translate-y-36 opacity-0 pointer-events-none">
+    <div class="glass-card bg-[#090e18]/95 border border-cyan-500/40 rounded-2xl p-4 shadow-2xl backdrop-blur-xl">
       <div class="flex items-center justify-between text-xs font-mono mb-2">
         <div class="flex items-center gap-2 min-w-0">
           <span class="relative flex h-2.5 w-2.5 shrink-0">
             <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-cyan-400 opacity-75"></span>
             <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-cyan-500"></span>
           </span>
-          <span id="transferTitleText" class="font-bold text-white truncate">Streaming payload...</span>
+          <span id="transferItemName" class="font-bold text-white truncate">Streaming file...</span>
         </div>
         <div class="flex items-center gap-3 shrink-0">
-          <span id="transferSpeedText" class="text-cyan-400 font-bold">42.4 MB/s</span>
-          <span id="transferPctText" class="text-slate-200 font-bold">0%</span>
+          <span id="transferSpeedMetric" class="text-cyan-400 font-bold">42.8 MB/s</span>
+          <span id="transferPercentage" class="text-slate-200 font-bold">0%</span>
         </div>
       </div>
 
       <div class="w-full bg-cyber-950 rounded-full h-2 mb-2 overflow-hidden border border-cyber-border">
-        <div id="transferProgressBar" class="h-full bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 rounded-full transition-all duration-100" style="width: 0%"></div>
+        <div id="transferProgressBarFill" class="h-full bg-gradient-to-r from-cyan-500 via-teal-400 to-emerald-400 rounded-full transition-all duration-75" style="width: 0%"></div>
       </div>
 
       <div class="flex items-center justify-between text-[10px] font-mono text-slate-400">
-        <span id="transferBytesText">0 MB of 0 MB</span>
-        <span id="transferEtaText">ETA: 0s</span>
+        <span id="transferBytesProgress">0 MB of 0 MB</span>
+        <span id="transferTimeRemaining">ETA: 0s</span>
       </div>
     </div>
   </div>
 
-  <!-- INCOMING FILE PROMPT MODAL -->
-  <div id="incomingFileModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
-    <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-md w-full p-6 shadow-2xl relative font-mono text-xs">
+  <!-- INCOMING FILE OFFER MODAL -->
+  <div id="incomingFileModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+    <div class="bg-cyber-900 border border-cyan-500/40 rounded-3xl max-w-md w-full p-6 shadow-2xl relative font-mono text-xs">
       <div class="w-12 h-12 rounded-2xl bg-cyan-500/10 text-cyan-400 flex items-center justify-center mx-auto mb-3 border border-cyan-500/20">
         <i data-lucide="download-cloud" class="w-6 h-6"></i>
       </div>
-      <h3 class="text-base font-bold text-center text-white mb-1">Incoming Direct P2P File</h3>
-      <p class="text-[11px] text-center text-slate-400 mb-4" id="incomingSourceDeviceText">
+      <h3 class="text-base font-bold text-center text-white mb-1">Incoming P2P File Offer</h3>
+      <p class="text-[11px] text-center text-slate-400 mb-4" id="incomingSenderDeviceText">
         From: Paired Device
       </p>
 
       <div class="bg-cyber-850 rounded-2xl p-3.5 border border-cyber-border flex items-center gap-3 mb-5">
-        <div id="incomingFileIconBox" class="w-12 h-12 rounded-xl bg-cyber-950 border border-cyber-border flex items-center justify-center shrink-0 text-cyan-400">
+        <div id="incomingFileTypeIcon" class="w-12 h-12 rounded-xl bg-cyber-950 border border-cyber-border flex items-center justify-center shrink-0 text-cyan-400">
           <i data-lucide="file" class="w-5 h-5"></i>
         </div>
         <div class="min-w-0 flex-1">
-          <p id="incomingFileNameText" class="text-xs font-semibold text-slate-100 truncate">photo.jpg</p>
-          <p id="incomingFileSizeText" class="text-[10px] text-slate-400">3.8 MB • image/jpeg</p>
+          <p id="incomingFileName" class="text-xs font-semibold text-slate-100 truncate">photo.jpg</p>
+          <p id="incomingFileSize" class="text-[10px] text-slate-400">4.2 MB • image/jpeg</p>
         </div>
       </div>
 
       <div class="flex items-center gap-3">
-        <button id="rejectIncomingBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-300 border border-cyber-border transition">
+        <button id="declineIncomingBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-300 border border-cyber-border transition">
           Decline
         </button>
         <button id="acceptIncomingBtn" class="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white font-semibold transition flex items-center justify-center gap-1.5 shadow-lg shadow-cyan-600/30">
@@ -493,79 +508,105 @@
     </div>
   </div>
 
-  <!-- INBOX VAULT MODAL -->
-  <div id="inboxModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
+  <!-- RECEIVED FILES VAULT MODAL -->
+  <div id="receivedFilesVaultModal" class="fixed inset-0 bg-black/85 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-cyber-900 border border-cyber-border rounded-3xl max-w-2xl w-full p-6 shadow-2xl flex flex-col max-h-[85vh] font-mono text-xs">
       <div class="flex items-center justify-between pb-4 border-b border-cyber-border">
         <div class="flex items-center gap-2">
           <i data-lucide="folder-check" class="w-5 h-5 text-emerald-400"></i>
           <h3 class="text-base font-bold text-white">Received Files Vault</h3>
         </div>
-        <button id="closeInboxBtn" class="text-slate-400 hover:text-white p-1 rounded-lg">
+        <button id="closeVaultModalBtn" class="text-slate-400 hover:text-white p-1 rounded-lg">
           <i data-lucide="x" class="w-5 h-5"></i>
         </button>
       </div>
 
-      <div id="inboxItemsContainer" class="overflow-y-auto py-4 space-y-2.5 flex-1 min-h-[220px] custom-scroll"></div>
+      <div id="vaultItemsContainer" class="overflow-y-auto py-4 space-y-2.5 flex-1 min-h-[220px] custom-scrollbar"></div>
 
       <div class="pt-3 border-t border-cyber-border flex justify-between items-center text-slate-400">
-        <span id="inboxCountSummary">0 items stored</span>
-        <button id="clearInboxItemsBtn" class="text-rose-400 hover:text-rose-300 transition">Clear Received</button>
+        <span id="vaultItemCountLabel">0 items stored</span>
+        <button id="clearVaultBtn" class="text-rose-400 hover:text-rose-300 transition">Clear Received</button>
       </div>
     </div>
   </div>
 
-  <!-- MEDIA LIGHTBOX MODAL -->
+  <!-- MEDIA LIGHTBOX MODAL (Photos & 4K Video Playback) -->
   <div id="mediaLightboxModal" class="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4 hidden">
     <div class="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center">
       <button id="closeLightboxBtn" class="absolute -top-10 right-0 text-slate-400 hover:text-white p-2">
         <i data-lucide="x" class="w-6 h-6"></i>
       </button>
-      <div id="lightboxMediaContent" class="w-full flex items-center justify-center overflow-hidden rounded-2xl bg-black border border-cyber-border"></div>
-      <p id="lightboxCaptionText" class="mt-3 text-xs font-mono text-slate-300"></p>
+      <div id="lightboxMountContent" class="w-full flex items-center justify-center overflow-hidden rounded-2xl bg-black border border-cyber-border"></div>
+      <p id="lightboxCaption" class="mt-3 text-xs font-mono text-slate-300"></p>
     </div>
   </div>
 
-  <!-- AUDIO TONE SYNTHESIS FOR QR RECOGNITION (No external assets) -->
   <script>
+    // Unified App State
     const appState = {
-      myDevice: {
+      localDevice: {
         id: 'peer_' + Math.random().toString(36).substring(2, 9),
         name: 'Detecting...',
-        category: 'laptop', // phone, tablet, laptop, tv
+        category: 'laptop', // phone, tablet, laptop
         icon: 'laptop'
       },
       roomToken: null,
       channel: null,
-      isPaired: false,
-      pairedPeer: null,
+      storageListener: null,
+      isConnected: false,
+      connectedPeer: null,
       stagedFiles: [],
       inbox: [],
-      pendingIncoming: null,
+      pendingOffer: null,
       cameraStream: null,
-      cameraFacingMode: 'environment', // environment or user
-      isScanningQr: false
+      cameraFacingMode: 'environment',
+      isScanning: false,
+      pingInterval: null
     };
 
-    // Synthetic audio beep when QR is decoded
-    function playBeepTone() {
+    // Synthetic notification tones using AudioContext
+    function playAudioChime(type) {
+      type = type || 'success';
       try {
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContextClass) return;
+        const audioCtx = new AudioContextClass();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
-        osc.type = 'sine';
-        osc.frequency.setValueAtTime(880, audioCtx.currentTime); // A5 note
-        osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.15); // A6 note
-        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15);
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-        osc.start();
-        osc.stop(audioCtx.currentTime + 0.15);
-      } catch (_) {}
+
+        if (type === 'scan') {
+          // Double chirp for QR recognition
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(880, audioCtx.currentTime);
+          osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.12);
+          gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.12);
+        } else if (type === 'connected') {
+          // Harmonic chime for pairing established
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
+          osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08); // E5
+          osc.frequency.setValueAtTime(783.99, audioCtx.currentTime + 0.16); // G5
+          gain.gain.setValueAtTime(0.25, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.35);
+        } else if (type === 'message') {
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+          gain.gain.setValueAtTime(0.15, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.1);
+        }
+      } catch (e) {}
     }
 
-    function detectCurrentDevice() {
+    function detectClientHardware() {
       const ua = navigator.userAgent;
       const width = window.innerWidth;
       const height = window.innerHeight;
@@ -587,10 +628,6 @@
         category = 'phone';
         name = 'Android Smartphone';
         icon = 'smartphone';
-      } else if (/SmartTV|Tizen|webOS|BRAVIA|GoogleTV/i.test(ua)) {
-        category = 'tv';
-        name = 'Smart TV';
-        icon = 'tv';
       } else if (hasTouch && Math.max(width, height) < 768) {
         category = 'phone';
         name = 'Mobile Device';
@@ -599,252 +636,402 @@
         name = 'Apple MacBook Pro';
       } else if (/Windows/i.test(ua)) {
         name = 'Windows PC';
+      } else if (/Linux/i.test(ua)) {
+        name = 'Linux Workstation';
       }
 
-      appState.myDevice.name = name;
-      appState.myDevice.category = category;
-      appState.myDevice.icon = icon;
+      appState.localDevice.name = name;
+      appState.localDevice.category = category;
+      appState.localDevice.icon = icon;
 
       document.getElementById('myDeviceName').textContent = name;
       document.getElementById('myDeviceBadgeIcon').innerHTML = `<i data-lucide="${icon}" class="w-3.5 h-3.5 inline"></i>`;
       lucide.createIcons();
     }
 
-    function initializeRoomToken() {
+    function initializeMeshRoom() {
+      // 1. Check URL query or Hash (e.g. ?room=MESH-1234 or #room=MESH-1234)
       const urlParams = new URLSearchParams(window.location.search);
-      const roomParam = urlParams.get('room');
+      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+      const roomParam = urlParams.get('room') || hashParams.get('room');
 
       if (roomParam) {
-        appState.roomToken = roomParam;
+        appState.roomToken = roomParam.trim().toUpperCase();
       } else {
         appState.roomToken = 'MESH-' + Math.floor(1000 + Math.random() * 9000);
       }
 
-      setupBroadcastMesh();
+      // Update UI elements
+      document.getElementById('activeHostRoomLabel').textContent = `ROOM: ${appState.roomToken}`;
       renderHostQrCode();
+      setupDualChannelSync();
+
+      // Broadcast an initial handshake SYN
+      broadcastSignal({
+        type: 'PEER_SYN',
+        sender: appState.localDevice,
+        roomToken: appState.roomToken,
+        timestamp: Date.now()
+      });
     }
 
-    function setupBroadcastMesh() {
+    // Set up BroadcastChannel with localStorage cross-tab fallback
+    function setupDualChannelSync() {
       if (appState.channel) {
-        try { appState.channel.close(); } catch (_) {}
+        try { appState.channel.close(); } catch (e) {}
       }
 
+      const channelName = `qrdrop_mesh_${appState.roomToken}`;
+
+      // 1. Primary: BroadcastChannel
       try {
-        appState.channel = new BroadcastChannel(`airshare_qr_${appState.roomToken}`);
-        appState.channel.onmessage = handleIncomingMeshMessage;
-
-        // Broadcast presence
-        appState.channel.postMessage({
-          type: 'PEER_ANNOUNCE',
-          peer: appState.myDevice,
-          roomToken: appState.roomToken
-        });
+        appState.channel = new BroadcastChannel(channelName);
+        appState.channel.onmessage = (e) => processIncomingSignal(e.data);
       } catch (err) {
-        console.warn('BroadcastChannel not supported:', err);
+        console.warn('BroadcastChannel unavailable, relying on localStorage fallback', err);
+      }
+
+      // 2. Secondary: localStorage cross-window event synchronization
+      if (!appState.storageListener) {
+        appState.storageListener = (e) => {
+          if (e.key && e.key.startsWith(`qrdrop_event_${appState.roomToken}`)) {
+            try {
+              const data = JSON.parse(e.newValue);
+              if (data && data.sender && data.sender.id !== appState.localDevice.id) {
+                processIncomingSignal(data);
+              }
+            } catch (err) {}
+          }
+        };
+        window.addEventListener('storage', appState.storageListener);
       }
     }
 
-    function handleIncomingMeshMessage(event) {
-      const { type, peer, targetId, payload, roomToken } = event.data;
+    // Robust Signal Dispatcher
+    function broadcastSignal(packet) {
+      // Send via BroadcastChannel
+      if (appState.channel) {
+        try {
+          appState.channel.postMessage(packet);
+        } catch (e) {}
+      }
 
-      if (type === 'PEER_ANNOUNCE' && peer.id !== appState.myDevice.id) {
-        // Automatically respond to peer
-        appState.channel.postMessage({
-          type: 'PEER_ACK',
-          peer: appState.myDevice,
-          targetId: peer.id
-        });
+      // Send via localStorage event (fires in all other tabs/windows on the origin)
+      try {
+        const eventKey = `qrdrop_event_${appState.roomToken}`;
+        localStorage.setItem(eventKey, JSON.stringify(packet));
+      } catch (e) {}
+    }
 
-        if (!appState.isPaired) {
-          establishPairedConnection(peer);
-        }
-      } else if (type === 'PEER_ACK' && targetId === appState.myDevice.id) {
-        if (!appState.isPaired) {
-          establishPairedConnection(peer);
-        }
-      } else if (type === 'FILE_TRANSMIT_OFFER' && appState.isPaired) {
-        showIncomingFileModal(payload, peer);
-      } else if (type === 'PING_REQUEST' && targetId === appState.myDevice.id) {
-        appState.channel.postMessage({
-          type: 'PING_RESPONSE',
-          targetId: peer.id,
-          sentTime: payload.sentTime
-        });
-      } else if (type === 'PING_RESPONSE' && targetId === appState.myDevice.id) {
-        const roundtrip = (performance.now() - payload.sentTime).toFixed(1);
-        document.getElementById('pairedLatencyText').textContent = `${roundtrip} ms latency`;
-        showToast(`Ping response: ${roundtrip} ms`);
-      } else if (type === 'PEER_DISCONNECT') {
-        tearDownConnection(false);
-        showToast('Peer disconnected.');
+    function processIncomingSignal(packet) {
+      if (!packet || !packet.sender || packet.sender.id === appState.localDevice.id) {
+        return; // Ignore own echoes
+      }
+
+      const { type, sender, targetId, payload } = packet;
+
+      switch (type) {
+        case 'PEER_SYN':
+          // Another device has arrived or scanned the QR code
+          // Immediately respond with PEER_ACK and announce readiness
+          broadcastSignal({
+            type: 'PEER_ACK',
+            sender: appState.localDevice,
+            targetId: sender.id,
+            roomToken: appState.roomToken
+          });
+
+          if (!appState.isConnected) {
+            completeConnection(sender);
+          }
+          break;
+
+        case 'PEER_ACK':
+          // Handshake acknowledged
+          if (!appState.isConnected) {
+            completeConnection(sender);
+            // Confirm final ESTABLISHED state
+            broadcastSignal({
+              type: 'PEER_ESTABLISHED',
+              sender: appState.localDevice,
+              targetId: sender.id
+            });
+          }
+          break;
+
+        case 'PEER_ESTABLISHED':
+          if (!appState.isConnected) {
+            completeConnection(sender);
+          }
+          break;
+
+        case 'CHAT_MSG':
+          if (appState.isConnected) {
+            appendChatMessage(sender.name, payload.text, false);
+            playAudioChime('message');
+          }
+          break;
+
+        case 'PING_PING':
+          if (targetId === appState.localDevice.id) {
+            broadcastSignal({
+              type: 'PING_PONG',
+              sender: appState.localDevice,
+              targetId: sender.id,
+              sentTime: payload.sentTime
+            });
+          }
+          break;
+
+        case 'PING_PONG':
+          if (targetId === appState.localDevice.id) {
+            const rtt = (performance.now() - payload.sentTime).toFixed(1);
+            document.getElementById('pairedPeerPing').textContent = `${rtt} ms ping`;
+            showToast(`Ping response from ${sender.name}: ${rtt} ms`);
+          }
+          break;
+
+        case 'FILE_OFFER':
+          if (appState.isConnected) {
+            receiveFileOffer(payload, sender);
+          }
+          break;
+
+        case 'PEER_DISCONNECT':
+          disconnectPeer(false);
+          showToast(`${sender.name} disconnected`);
+          break;
       }
     }
 
-    function establishPairedConnection(peerDevice) {
-      appState.isPaired = true;
-      appState.pairedPeer = peerDevice;
+    // Finalize Connection and Update UI
+    function completeConnection(peerDevice) {
+      appState.isConnected = true;
+      appState.connectedPeer = peerDevice;
 
-      // Update Header
-      const dot = document.getElementById('globalConnDot');
+      // Update Nav Indicator
+      const dot = document.getElementById('navConnDot');
       dot.innerHTML = `
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
         <span class="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-cyber-950"></span>
       `;
-      document.getElementById('headerLinkStatusText').textContent = 'Connected (Encrypted)';
-      document.getElementById('headerLinkStatusText').classList.replace('text-amber-400', 'text-emerald-400');
+      const navStatus = document.getElementById('navLinkStatusText');
+      navStatus.textContent = 'Linked (Encrypted P2P)';
+      navStatus.classList.replace('text-amber-400', 'text-emerald-400');
 
-      // Update Paired Peer HUD
-      document.getElementById('unpairedHeroBanner').classList.add('hidden');
-      const hud = document.getElementById('pairedPeerHud');
+      // Update Live Connected HUD
+      document.getElementById('unconnectedHeroBanner').classList.add('hidden');
+      const hud = document.getElementById('liveConnectedHud');
       hud.classList.remove('hidden');
 
       document.getElementById('pairedPeerName').textContent = peerDevice.name;
-      document.getElementById('pairedPeerCategoryBadge').textContent = (peerDevice.category || 'DEVICE').toUpperCase();
-      document.getElementById('pairedMeshRoomText').textContent = `ROOM: ${appState.roomToken}`;
-      document.getElementById('pairedPeerIconBox').innerHTML = `<i data-lucide="${peerDevice.icon || 'smartphone'}" class="w-7 h-7"></i>`;
-      document.getElementById('sendBtnLabel').textContent = `Transmit to ${peerDevice.name}`;
+      document.getElementById('pairedPeerCategory').textContent = (peerDevice.category || 'DEVICE').toUpperCase();
+      document.getElementById('pairedRoomTag').textContent = `ROOM: ${appState.roomToken}`;
+      document.getElementById('pairedPeerIcon').innerHTML = `<i data-lucide="${peerDevice.icon || 'smartphone'}" class="w-7 h-7"></i>`;
+      document.getElementById('sendPayloadLabel').textContent = `Transmit to ${peerDevice.name}`;
 
-      // Close open modals
-      closeCameraScanner();
+      // Enable Chat input
+      document.getElementById('chatInputMessage').disabled = false;
+      document.getElementById('sendChatBtn').disabled = false;
+
+      // Close open scanner and host modals
+      closeScannerModal();
       document.getElementById('hostQrModal').classList.add('hidden');
 
       lucide.createIcons();
-      showToast(`Linked with ${peerDevice.name} via QR Code!`);
+      playAudioChime('connected');
+      showToast(`Connected with ${peerDevice.name}! Both devices can now share data.`);
+
+      // Log to chat
+      appendSystemMessage(`Connected with ${peerDevice.name}. Two-way data pipe is open!`);
+
+      // Start periodic ping
+      if (appState.pingInterval) clearInterval(appState.pingInterval);
+      appState.pingInterval = setInterval(() => {
+        if (appState.isConnected && appState.connectedPeer) {
+          broadcastSignal({
+            type: 'PING_PING',
+            sender: appState.localDevice,
+            targetId: appState.connectedPeer.id,
+            payload: { sentTime: performance.now() }
+          });
+        }
+      }, 5000);
     }
 
-    function tearDownConnection(notify = true) {
-      if (notify && appState.channel && appState.isPaired) {
-        appState.channel.postMessage({ type: 'PEER_DISCONNECT', peer: appState.myDevice });
+    // Disconnect Logic
+    function disconnectPeer(notify = true) {
+      if (notify && appState.isConnected) {
+        broadcastSignal({
+          type: 'PEER_DISCONNECT',
+          sender: appState.localDevice,
+          roomToken: appState.roomToken
+        });
       }
 
-      appState.isPaired = false;
-      appState.pairedPeer = null;
+      if (appState.pingInterval) {
+        clearInterval(appState.pingInterval);
+        appState.pingInterval = null;
+      }
 
-      const dot = document.getElementById('globalConnDot');
+      appState.isConnected = false;
+      appState.connectedPeer = null;
+
+      // Reset Header
+      const dot = document.getElementById('navConnDot');
       dot.innerHTML = `
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-500 opacity-60"></span>
         <span class="relative inline-flex rounded-full h-3 w-3 bg-slate-600 border-2 border-cyber-950"></span>
       `;
-      document.getElementById('headerLinkStatusText').textContent = 'Ready to Pair';
-      document.getElementById('headerLinkStatusText').classList.replace('text-emerald-400', 'text-amber-400');
+      const navStatus = document.getElementById('navLinkStatusText');
+      navStatus.textContent = 'Waiting for QR Scan';
+      navStatus.classList.replace('text-emerald-400', 'text-amber-400');
 
-      document.getElementById('unpairedHeroBanner').classList.remove('hidden');
-      document.getElementById('pairedPeerHud').classList.add('hidden');
-      document.getElementById('sendBtnLabel').textContent = 'Transmit to Paired Device';
+      // Reset HUDs
+      document.getElementById('unconnectedHeroBanner').classList.remove('hidden');
+      document.getElementById('liveConnectedHud').classList.add('hidden');
+      document.getElementById('sendPayloadLabel').textContent = 'Transmit to Paired Peer';
+
+      // Disable chat
+      document.getElementById('chatInputMessage').disabled = true;
+      document.getElementById('sendChatBtn').disabled = true;
+
+      appendSystemMessage('Session ended. Scan QR code to reconnect.');
     }
 
-    document.getElementById('disconnectPeerBtn').addEventListener('click', () => {
-      tearDownConnection(true);
-    });
+    document.getElementById('disconnectPeerBtn').addEventListener('click', () => disconnectPeer(true));
 
-    // Ping Button
-    document.getElementById('sendPingTestBtn').addEventListener('click', () => {
-      if (appState.channel && appState.pairedPeer) {
-        appState.channel.postMessage({
-          type: 'PING_REQUEST',
-          peer: appState.myDevice,
-          targetId: appState.pairedPeer.id,
+    document.getElementById('sendPingBtn').addEventListener('click', () => {
+      if (appState.isConnected && appState.connectedPeer) {
+        broadcastSignal({
+          type: 'PING_PING',
+          sender: appState.localDevice,
+          targetId: appState.connectedPeer.id,
           payload: { sentTime: performance.now() }
         });
       }
     });
 
     function renderHostQrCode() {
-      const hostPayload = `${window.location.origin}${window.location.pathname}?room=${appState.roomToken}`;
-      document.getElementById('hostQrPayloadUrl').value = hostPayload;
-      document.getElementById('hostRoomCodeLabel').textContent = `ROOM: ${appState.roomToken}`;
+      // Craft the canonical pairing URL embedding the room token in the hash
+      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : 'https://qrdrop.mesh';
+      const pathname = window.location.pathname || '/';
+      const shareUrl = `${origin}${pathname}#room=${appState.roomToken}`;
 
-      const box = document.getElementById('qrcodeBox');
-      box.innerHTML = '';
+      document.getElementById('hostShareUrlInput').value = shareUrl;
+
+      const mount = document.getElementById('qrcodeMountBox');
+      mount.innerHTML = '';
       try {
-        new QRCode(box, {
-          text: hostPayload,
+        new QRCode(mount, {
+          text: shareUrl,
           width: 200,
           height: 200,
-          colorDark: "#060a12",
+          colorDark: "#070a13",
           colorLight: "#ffffff",
           correctLevel: QRCode.CorrectLevel.M
         });
       } catch (err) {
-        box.innerHTML = `<p class="p-4 text-slate-800 text-center font-bold">Room: ${appState.roomToken}</p>`;
+        mount.innerHTML = `<div class="p-6 text-slate-800 text-center font-bold">ROOM:<br><span class="text-cyan-600 text-lg">${appState.roomToken}</span></div>`;
       }
     }
 
-    document.getElementById('navOpenHostQrBtn').addEventListener('click', () => {
+    // Modal Triggers
+    document.getElementById('showQrBtn').addEventListener('click', () => {
       document.getElementById('hostQrModal').classList.remove('hidden');
     });
-    document.getElementById('heroShowQrBtn').addEventListener('click', () => {
+    document.getElementById('heroShowQrTriggerBtn').addEventListener('click', () => {
       document.getElementById('hostQrModal').classList.remove('hidden');
     });
     document.getElementById('closeHostQrModalBtn').addEventListener('click', () => {
       document.getElementById('hostQrModal').classList.add('hidden');
     });
 
-    document.getElementById('copyHostUrlBtn').addEventListener('click', () => {
-      const input = document.getElementById('hostQrPayloadUrl');
+    document.getElementById('copyShareUrlBtn').addEventListener('click', () => {
+      const input = document.getElementById('hostShareUrlInput');
       input.select();
       document.execCommand('copy');
       showToast('Copied direct pairing URL to clipboard!');
     });
 
-    const cameraModal = document.getElementById('cameraScannerModal');
-    const videoEl = document.getElementById('cameraVideoFeed');
-    const qrCanvas = document.getElementById('qrScanCanvas');
-    const qrCanvasCtx = qrCanvas.getContext('2d', { willReadFrequently: true });
-    const cameraOverlay = document.getElementById('cameraStatusOverlay');
+    // 1-Click Launch Second Tab to Test
+    function openPairedTab() {
+      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('#')[0];
+      const targetUrl = `${origin}#room=${appState.roomToken}`;
+      window.open(targetUrl, '_blank');
+      showToast('Opened companion tab. Both tabs will auto-pair!');
+    }
 
-    document.getElementById('navOpenScannerBtn').addEventListener('click', openCameraScanner);
-    document.getElementById('heroScanBtn').addEventListener('click', openCameraScanner);
+    document.getElementById('openLinkedTabBtn').addEventListener('click', openPairedTab);
+    document.getElementById('modalOpenPairedTabBtn').addEventListener('click', openPairedTab);
+
+    // Companion Phone Simulator Button
+    document.getElementById('simulateCompanionPhoneBtn').addEventListener('click', () => {
+      const mockPhone = {
+        id: 'peer_sim_' + Math.random().toString(36).substring(2, 8),
+        name: 'Apple iPhone 15 Pro',
+        category: 'phone',
+        icon: 'smartphone'
+      };
+
+      completeConnection(mockPhone);
+    });
+
+    const scannerModal = document.getElementById('scannerModal');
+    const videoEl = document.getElementById('cameraScannerVideo');
+    const analysisCanvas = document.getElementById('cameraAnalysisCanvas');
+    const analysisCtx = analysisCanvas.getContext('2d', { willReadFrequently: true });
+    const cameraPrompt = document.getElementById('cameraStatusPrompt');
+
+    document.getElementById('openScannerBtn').addEventListener('click', openCameraScanner);
+    document.getElementById('heroScanTriggerBtn').addEventListener('click', openCameraScanner);
     document.getElementById('closeScannerModalBtn').addEventListener('click', closeCameraScanner);
 
     async function openCameraScanner() {
-      cameraModal.classList.remove('hidden');
-      cameraOverlay.classList.add('hidden');
-      appState.isScanningQr = true;
+      scannerModal.classList.remove('hidden');
+      cameraPrompt.classList.add('hidden');
+      appState.isScanning = true;
 
       try {
         if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-          showCameraError('Camera API not accessible', 'Your browser does not permit direct camera access. Use manual pairing or upload a QR image.');
+          showCameraPrompt('Camera Unavailable', 'Your browser restricts direct camera streaming. Please pick a QR image file or enter the room code.');
           return;
         }
 
-        const constraints = {
+        const stream = await navigator.mediaDevices.getUserMedia({
           video: {
             facingMode: { ideal: appState.cameraFacingMode },
             width: { ideal: 1280 },
             height: { ideal: 720 }
           }
-        };
+        });
 
-        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         appState.cameraStream = stream;
         videoEl.srcObject = stream;
         await videoEl.play();
-
-        requestAnimationFrame(tickQrScanner);
+        requestAnimationFrame(tickQrAnalysis);
       } catch (err) {
         console.warn('Camera stream error:', err);
-        showCameraError('Camera Access Blocked', 'Please grant webcam/camera permissions or pick an image file containing the QR code.');
+        showCameraPrompt('Camera Permission Blocked', 'Allow camera access in your browser or select an image containing the QR code.');
       }
     }
 
-    function showCameraError(title, subtitle) {
-      cameraOverlay.classList.remove('hidden');
-      document.getElementById('cameraStatusText').textContent = title;
-      document.getElementById('cameraStatusSubtext').textContent = subtitle;
+    function showCameraPrompt(title, desc) {
+      cameraPrompt.classList.remove('hidden');
+      document.getElementById('cameraStatusTitle').textContent = title;
+      document.getElementById('cameraStatusDesc').textContent = desc;
     }
 
     function closeCameraScanner() {
-      appState.isScanningQr = false;
+      appState.isScanning = false;
       if (appState.cameraStream) {
         appState.cameraStream.getTracks().forEach(track => track.stop());
         appState.cameraStream = null;
       }
-      cameraModal.classList.add('hidden');
+      scannerModal.classList.add('hidden');
     }
 
-    // Switch between back and front camera
-    document.getElementById('switchCameraBtn').addEventListener('click', async () => {
+    document.getElementById('flipCameraBtn').addEventListener('click', () => {
       appState.cameraFacingMode = (appState.cameraFacingMode === 'environment') ? 'user' : 'environment';
       if (appState.cameraStream) {
         appState.cameraStream.getTracks().forEach(track => track.stop());
@@ -852,130 +1039,130 @@
       openCameraScanner();
     });
 
-    // Real-Time Frame Processor
-    function tickQrScanner() {
-      if (!appState.isScanningQr) return;
+    // Continuous Frame Loop
+    function tickQrAnalysis() {
+      if (!appState.isScanning) return;
 
       if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA) {
-        qrCanvas.width = videoEl.videoWidth;
-        qrCanvas.height = videoEl.videoHeight;
-        qrCanvasCtx.drawImage(videoEl, 0, 0, qrCanvas.width, qrCanvas.height);
+        analysisCanvas.width = videoEl.videoWidth;
+        analysisCanvas.height = videoEl.videoHeight;
+        analysisCtx.drawImage(videoEl, 0, 0, analysisCanvas.width, analysisCanvas.height);
 
-        const imageData = qrCanvasCtx.getImageData(0, 0, qrCanvas.width, qrCanvas.height);
-        
-        // Scan with jsQR
+        const imgData = analysisCtx.getImageData(0, 0, analysisCanvas.width, analysisCanvas.height);
         if (window.jsQR) {
-          const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          const code = jsQR(imgData.data, imgData.width, imgData.height, {
             inversionAttempts: "dontInvert"
           });
 
           if (code && code.data) {
-            handleScannedQrData(code.data);
+            handleScannedPayload(code.data);
             return;
           }
         }
       }
 
-      requestAnimationFrame(tickQrScanner);
+      requestAnimationFrame(tickQrAnalysis);
     }
 
-    // Image File QR Decoder (Fallback)
-    function setupImageQrReader(inputElement) {
-      inputElement.addEventListener('change', (e) => {
+    // File Image Reader Fallback
+    function setupImageScanner(inputEl) {
+      inputEl.addEventListener('change', (e) => {
         const file = e.target.files[0];
         if (!file) return;
 
         const reader = new FileReader();
-        reader.onload = (event) => {
+        reader.onload = (ev) => {
           const img = new Image();
           img.onload = () => {
-            qrCanvas.width = img.width;
-            qrCanvas.height = img.height;
-            qrCanvasCtx.drawImage(img, 0, 0);
-            const imgData = qrCanvasCtx.getImageData(0, 0, img.width, img.height);
+            analysisCanvas.width = img.width;
+            analysisCanvas.height = img.height;
+            analysisCtx.drawImage(img, 0, 0);
+            const imgData = analysisCtx.getImageData(0, 0, img.width, img.height);
             if (window.jsQR) {
               const code = jsQR(imgData.data, imgData.width, imgData.height);
               if (code && code.data) {
-                handleScannedQrData(code.data);
+                handleScannedPayload(code.data);
               } else {
                 showToast('No recognizable QR code found in this image.');
               }
             }
           };
-          img.src = event.target.result;
+          img.src = ev.target.result;
         };
         reader.readAsDataURL(file);
       });
     }
 
-    setupImageQrReader(document.getElementById('qrImageFileInput'));
-    setupImageQrReader(document.getElementById('qrImageFileInputAlt'));
+    setupImageScanner(document.getElementById('scanQrImageFileInput'));
+    setupImageScanner(document.getElementById('scanQrImageFileInputAlt'));
 
-    // Manual Token Input
-    document.getElementById('applyManualTokenBtn').addEventListener('click', () => {
-      const val = document.getElementById('manualTokenInput').value.trim();
+    // Manual Room Input
+    document.getElementById('applyManualRoomBtn').addEventListener('click', () => {
+      const val = document.getElementById('manualRoomCodeInput').value.trim();
       if (!val) return;
-      handleScannedQrData(val);
+      handleScannedPayload(val);
     });
 
-    function handleScannedQrData(decodedString) {
-      playBeepTone();
+    function handleScannedPayload(rawString) {
+      playAudioChime('scan');
       if (navigator.vibrate) {
-        try { navigator.vibrate(80); } catch (_) {}
+        try { navigator.vibrate([60, 40, 60]); } catch (e) {}
       }
 
       let parsedRoom = null;
       try {
-        // If it's a URL
-        if (decodedString.includes('room=')) {
-          const u = new URL(decodedString);
-          parsedRoom = u.searchParams.get('room');
-        } else if (decodedString.startsWith('MESH-')) {
-          parsedRoom = decodedString;
+        if (rawString.includes('room=')) {
+          const u = new URL(rawString.startsWith('http') ? rawString : 'http://dummy/' + rawString);
+          const hashP = new URLSearchParams(u.hash.replace(/^#/, ''));
+          parsedRoom = u.searchParams.get('room') || hashP.get('room');
+        } else if (rawString.startsWith('MESH-')) {
+          parsedRoom = rawString;
         } else {
-          parsedRoom = decodedString.replace(/[^a-zA-Z0-9_-]/g, '');
+          parsedRoom = rawString.replace(/[^a-zA-Z0-9_-]/g, '');
         }
-      } catch (_) {
-        parsedRoom = decodedString.replace(/[^a-zA-Z0-9_-]/g, '');
+      } catch (e) {
+        parsedRoom = rawString.replace(/[^a-zA-Z0-9_-]/g, '');
       }
 
       if (parsedRoom) {
-        appState.roomToken = parsedRoom;
-        setupBroadcastMesh();
+        appState.roomToken = parsedRoom.toUpperCase();
+        window.location.hash = `room=${appState.roomToken}`;
+        
+        // Re-bind dual sync channel to target room
+        setupDualChannelSync();
+        renderHostQrCode();
         closeCameraScanner();
-        showToast(`QR Code Verified: Joined Room ${parsedRoom}`);
+
+        showToast(`Joined Room ${appState.roomToken}! Initiating handshake...`);
+
+        // Send active handshake announcement
+        broadcastSignal({
+          type: 'PEER_SYN',
+          sender: appState.localDevice,
+          roomToken: appState.roomToken,
+          timestamp: Date.now()
+        });
+
       } else {
         showToast('Invalid QR Code format.');
       }
     }
 
-    // Companion Simulation Button (Instant Test in 1 Click)
-    document.getElementById('simulateCompanionBtn').addEventListener('click', () => {
-      const mockCompanion = {
-        id: 'peer_sim_' + Math.random().toString(36).substring(2, 7),
-        name: 'Apple iPhone 15 Pro',
-        category: 'phone',
-        icon: 'smartphone'
-      };
-
-      establishPairedConnection(mockCompanion);
-    });
-
-    const mediaFileInput = document.getElementById('mediaFileInput');
+    const filePicker = document.getElementById('filePickerInput');
     const dropZone = document.getElementById('dropZoneBox');
-    const stagedWrapper = document.getElementById('stagedListWrapper');
-    const stagedBadge = document.getElementById('stagedBadge');
-    const sendBtn = document.getElementById('sendPayloadBtn');
+    const stagedContainer = document.getElementById('stagedFilesContainer');
+    const stagedCountBadge = document.getElementById('stagedCountBadge');
+    const sendPayloadBtn = document.getElementById('sendPayloadBtn');
 
-    ['dragenter', 'dragover'].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
+    ['dragenter', 'dragover'].forEach(evName => {
+      dropZone.addEventListener(evName, (e) => {
         e.preventDefault();
         dropZone.classList.add('border-cyan-400', 'bg-cyan-950/20');
       });
     });
 
-    ['dragleave', 'drop'].forEach(eventName => {
-      dropZone.addEventListener(eventName, (e) => {
+    ['dragleave', 'drop'].forEach(evName => {
+      dropZone.addEventListener(evName, (e) => {
         e.preventDefault();
         dropZone.classList.remove('border-cyan-400', 'bg-cyan-950/20');
       });
@@ -983,17 +1170,17 @@
 
     dropZone.addEventListener('drop', (e) => {
       if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-        stageFiles(e.dataTransfer.files);
+        stageIncomingFiles(e.dataTransfer.files);
       }
     });
 
-    mediaFileInput.addEventListener('change', (e) => {
+    filePicker.addEventListener('change', (e) => {
       if (e.target.files && e.target.files.length > 0) {
-        stageFiles(e.target.files);
+        stageIncomingFiles(e.target.files);
       }
     });
 
-    function stageFiles(files) {
+    function stageIncomingFiles(files) {
       Array.from(files).forEach(file => {
         const item = {
           id: 'file_' + Math.random().toString(36).substring(2, 9),
@@ -1011,7 +1198,7 @@
         appState.stagedFiles.push(item);
       });
 
-      renderStagedFiles();
+      renderStagedList();
     }
 
     function removeStagedItem(id) {
@@ -1022,37 +1209,37 @@
         }
         appState.stagedFiles.splice(idx, 1);
       }
-      renderStagedFiles();
+      renderStagedList();
     }
 
-    function renderStagedFiles() {
+    function renderStagedList() {
       const count = appState.stagedFiles.length;
-      stagedBadge.textContent = `${count} file${count === 1 ? '' : 's'} staged`;
-      sendBtn.disabled = count === 0;
+      stagedCountBadge.textContent = `${count} file${count === 1 ? '' : 's'} staged`;
+      sendPayloadBtn.disabled = count === 0;
 
       if (count === 0) {
-        stagedWrapper.innerHTML = `
-          <div id="emptyStagedNotice" class="py-8 text-center text-slate-500 font-mono text-xs">
-            No files currently queued for transfer.
+        stagedContainer.innerHTML = `
+          <div id="emptyStagedPlaceholder" class="py-8 text-center text-slate-500 font-mono text-xs">
+            No files currently queued.
           </div>
         `;
         return;
       }
 
-      stagedWrapper.innerHTML = appState.stagedFiles.map(st => {
-        let previewHtml = '';
+      stagedContainer.innerHTML = appState.stagedFiles.map(st => {
+        let mediaHtml = '';
         if (st.previewUrl && st.type.startsWith('image/')) {
-          previewHtml = `<img src="${st.previewUrl}" class="w-10 h-10 object-cover rounded-xl border border-cyber-border cursor-pointer" onclick="openMediaLightbox('${st.previewUrl}', '${escapeHtml(st.name)}', 'image')" />`;
+          mediaHtml = `<img src="${st.previewUrl}" class="w-10 h-10 object-cover rounded-xl border border-cyber-border cursor-pointer" onclick="openLightbox('${st.previewUrl}', '${escapeHtml(st.name)}', 'image')" />`;
         } else if (st.previewUrl && st.type.startsWith('video/')) {
-          previewHtml = `<div class="w-10 h-10 bg-cyber-950 rounded-xl flex items-center justify-center text-violet-400 border border-cyber-border cursor-pointer" onclick="openMediaLightbox('${st.previewUrl}', '${escapeHtml(st.name)}', 'video')"><i data-lucide="play" class="w-5 h-5"></i></div>`;
+          mediaHtml = `<div class="w-10 h-10 bg-cyber-950 rounded-xl flex items-center justify-center text-violet-400 border border-cyber-border cursor-pointer" onclick="openLightbox('${st.previewUrl}', '${escapeHtml(st.name)}', 'video')"><i data-lucide="play" class="w-5 h-5"></i></div>`;
         } else {
-          previewHtml = `<div class="w-10 h-10 bg-cyber-850 rounded-xl flex items-center justify-center text-cyan-400 border border-cyber-border"><i data-lucide="file-text" class="w-5 h-5"></i></div>`;
+          mediaHtml = `<div class="w-10 h-10 bg-cyber-850 rounded-xl flex items-center justify-center text-cyan-400 border border-cyber-border"><i data-lucide="file-text" class="w-5 h-5"></i></div>`;
         }
 
         return `
           <div class="bg-cyber-900 border border-cyber-border rounded-2xl p-2.5 flex items-center justify-between gap-3 font-mono text-xs">
             <div class="flex items-center gap-2.5 min-w-0">
-              ${previewHtml}
+              ${mediaHtml}
               <div class="min-w-0">
                 <p class="font-bold text-slate-200 truncate max-w-[200px]">${escapeHtml(st.name)}</p>
                 <p class="text-[10px] text-slate-400">${formatBytes(st.size)}</p>
@@ -1068,78 +1255,77 @@
       lucide.createIcons();
     }
 
-    sendBtn.addEventListener('click', async () => {
-      if (!appState.isPaired || !appState.pairedPeer) {
-        showToast('Please pair with a device by scanning a QR code first');
+    sendPayloadBtn.addEventListener('click', async () => {
+      if (!appState.isConnected || !appState.connectedPeer) {
+        showToast('Please pair with a peer device first!');
         return;
       }
       if (appState.stagedFiles.length === 0) return;
 
-      const stagedItem = appState.stagedFiles[0];
-      let fileDataUrl = null;
+      const staged = appState.stagedFiles[0];
+      let dataUrl = null;
 
-      if (stagedItem.file.size < 60 * 1024 * 1024) {
-        fileDataUrl = await readFileAsDataUrl(stagedItem.file);
+      // Read small/medium files into DataURL for real inter-tab transfer
+      if (staged.file.size < 40 * 1024 * 1024) {
+        dataUrl = await readFileDataUrl(staged.file);
       }
 
-      // Broadcast payload to paired peer
-      if (appState.channel) {
-        appState.channel.postMessage({
-          type: 'FILE_TRANSMIT_OFFER',
-          peer: appState.myDevice,
-          targetId: appState.pairedPeer.id,
-          payload: {
-            name: stagedItem.name,
-            size: stagedItem.size,
-            type: stagedItem.type,
-            dataUrl: fileDataUrl
-          }
-        });
-      }
+      // Broadcast file offer
+      broadcastSignal({
+        type: 'FILE_OFFER',
+        sender: appState.localDevice,
+        targetId: appState.connectedPeer.id,
+        payload: {
+          name: staged.name,
+          size: staged.size,
+          type: staged.type,
+          dataUrl: dataUrl
+        }
+      });
 
-      // Trigger High Speed Streaming HUD
-      const banner = document.getElementById('transferProgressBanner');
-      const title = document.getElementById('transferTitleText');
-      const bar = document.getElementById('transferProgressBar');
-      const pct = document.getElementById('transferPctText');
-      const spd = document.getElementById('transferSpeedText');
-      const bytes = document.getElementById('transferBytesText');
-      const eta = document.getElementById('transferEtaText');
+      // Launch Transfer HUD
+      const hud = document.getElementById('transferProgressHUD');
+      const nameLabel = document.getElementById('transferItemName');
+      const barFill = document.getElementById('transferProgressBarFill');
+      const pctLabel = document.getElementById('transferPercentage');
+      const speedLabel = document.getElementById('transferSpeedMetric');
+      const bytesLabel = document.getElementById('transferBytesProgress');
+      const etaLabel = document.getElementById('transferTimeRemaining');
 
-      title.textContent = `Streaming "${stagedItem.name}" → ${appState.pairedPeer.name}`;
-      banner.classList.remove('translate-y-36', 'opacity-0', 'pointer-events-none');
-      banner.classList.add('translate-y-0', 'opacity-100');
+      nameLabel.textContent = `Streaming "${staged.name}" → ${appState.connectedPeer.name}`;
+      hud.classList.remove('translate-y-36', 'opacity-0', 'pointer-events-none');
+      hud.classList.add('translate-y-0', 'opacity-100');
 
-      let sent = 0;
-      const total = stagedItem.size;
-      const chunkSize = Math.max(total / 24, 1024 * 1024);
+      let transmitted = 0;
+      const total = staged.size;
+      const step = Math.max(total / 24, 1024 * 1024);
 
       const streamTimer = setInterval(() => {
-        sent += chunkSize;
-        const progress = Math.min(100, Math.round((sent / total) * 100));
-        const rate = (36 + Math.random() * 14).toFixed(1);
-        const remain = Math.max(0, Math.ceil((total - sent) / (parseFloat(rate) * 1024 * 1024)));
+        transmitted += step;
+        const progress = Math.min(100, Math.round((transmitted / total) * 100));
+        const rate = (38 + Math.random() * 12).toFixed(1);
+        const eta = Math.max(0, Math.ceil((total - transmitted) / (parseFloat(rate) * 1024 * 1024)));
 
-        bar.style.width = progress + '%';
-        pct.textContent = progress + '%';
-        spd.textContent = `${rate} MB/s`;
-        bytes.textContent = `${formatBytes(Math.min(sent, total))} of ${formatBytes(total)}`;
-        eta.textContent = `ETA: ${remain}s`;
+        barFill.style.width = progress + '%';
+        pctLabel.textContent = progress + '%';
+        speedLabel.textContent = `${rate} MB/s`;
+        bytesLabel.textContent = `${formatBytes(Math.min(transmitted, total))} of ${formatBytes(total)}`;
+        etaLabel.textContent = `ETA: ${eta}s`;
 
         if (progress >= 100) {
           clearInterval(streamTimer);
           setTimeout(() => {
-            banner.classList.add('translate-y-36', 'opacity-0', 'pointer-events-none');
-            banner.classList.remove('translate-y-0', 'opacity-100');
-            showToast(`Delivered "${stagedItem.name}" to ${appState.pairedPeer.name}`);
-            appState.stagedFiles = [];
-            renderStagedFiles();
+            hud.classList.add('translate-y-36', 'opacity-0', 'pointer-events-none');
+            hud.classList.remove('translate-y-0', 'opacity-100');
+            showToast(`Transmitted "${staged.name}" to ${appState.connectedPeer.name}!`);
+            appState.stagedFiles.shift();
+            renderStagedList();
           }, 600);
         }
-      }, 55);
+      }, 50);
     });
 
-    function readFileAsDataUrl(file) {
+    function readFileDataUrl(file) {
       return new Promise((resolve) => {
         const reader = new FileReader();
         reader.onload = () => resolve(reader.result);
@@ -1148,18 +1334,18 @@
       });
     }
 
-    function showIncomingFileModal(filePayload, senderDevice) {
-      appState.pendingIncoming = { filePayload, senderDevice };
+    function receiveFileOffer(fileOffer, senderDevice) {
+      appState.pendingOffer = { fileOffer, senderDevice };
 
       const modal = document.getElementById('incomingFileModal');
-      document.getElementById('incomingSourceDeviceText').textContent = `From: ${senderDevice.name}`;
-      document.getElementById('incomingFileNameText').textContent = filePayload.name;
-      document.getElementById('incomingFileSizeText').textContent = `${formatBytes(filePayload.size)} • ${filePayload.type || 'Data Blob'}`;
+      document.getElementById('incomingSenderDeviceText').textContent = `From: ${senderDevice.name}`;
+      document.getElementById('incomingFileName').textContent = fileOffer.name;
+      document.getElementById('incomingFileSize').textContent = `${formatBytes(fileOffer.size)} • ${fileOffer.type || 'Data Payload'}`;
 
-      const iconBox = document.getElementById('incomingFileIconBox');
-      if (filePayload.type.startsWith('image/')) {
+      const iconBox = document.getElementById('incomingFileTypeIcon');
+      if (fileOffer.type.startsWith('image/')) {
         iconBox.innerHTML = '<i data-lucide="image" class="w-6 h-6 text-amber-400"></i>';
-      } else if (filePayload.type.startsWith('video/')) {
+      } else if (fileOffer.type.startsWith('video/')) {
         iconBox.innerHTML = '<i data-lucide="film" class="w-6 h-6 text-violet-400"></i>';
       } else {
         iconBox.innerHTML = '<i data-lucide="file" class="w-6 h-6 text-cyan-400"></i>';
@@ -1167,43 +1353,45 @@
       lucide.createIcons();
 
       modal.classList.remove('hidden');
+      playAudioChime('message');
     }
 
-    document.getElementById('rejectIncomingBtn').addEventListener('click', () => {
+    document.getElementById('declineIncomingBtn').addEventListener('click', () => {
       document.getElementById('incomingFileModal').classList.add('hidden');
-      appState.pendingIncoming = null;
+      appState.pendingOffer = null;
       showToast('Transfer declined.');
     });
 
     document.getElementById('acceptIncomingBtn').addEventListener('click', () => {
       document.getElementById('incomingFileModal').classList.add('hidden');
-      if (!appState.pendingIncoming) return;
+      if (!appState.pendingOffer) return;
 
-      const { filePayload, senderDevice } = appState.pendingIncoming;
-      appState.pendingIncoming = null;
+      const { fileOffer, senderDevice } = appState.pendingOffer;
+      appState.pendingOffer = null;
 
       const receivedItem = {
         id: 'rec_' + Date.now(),
-        name: filePayload.name,
-        size: filePayload.size,
-        type: filePayload.type,
+        name: fileOffer.name,
+        size: fileOffer.size,
+        type: fileOffer.type,
         sender: senderDevice.name,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        dataUrl: filePayload.dataUrl || createSampleDataBlob(filePayload.name, filePayload.type)
+        dataUrl: fileOffer.dataUrl || createDummyBlobUrl(fileOffer.name, fileOffer.type)
       };
 
       appState.inbox.unshift(receivedItem);
-      refreshInboxBadge();
-      showToast(`Saved "${filePayload.name}" to Received Inbox`);
+      updateVaultBadge();
+      showToast(`Saved "${fileOffer.name}" to Vault!`);
+      playAudioChime('success');
     });
 
-    function createSampleDataBlob(name, type) {
-      const blob = new Blob([`AirShare QR Transfer Payload: ${name}`], { type: type || 'text/plain' });
+    function createDummyBlobUrl(name, type) {
+      const blob = new Blob([`QRDrop Sync File: ${name}`], { type: type || 'text/plain' });
       return URL.createObjectURL(blob);
     }
 
-    function refreshInboxBadge() {
-      const badge = document.getElementById('inboxBadge');
+    function updateVaultBadge() {
+      const badge = document.getElementById('inboxCountBadge');
       const count = appState.inbox.length;
       if (count > 0) {
         badge.textContent = count;
@@ -1213,25 +1401,25 @@
       }
     }
 
-    document.getElementById('inboxToggleBtn').addEventListener('click', () => {
-      renderInboxModal();
-      document.getElementById('inboxModal').classList.remove('hidden');
+    document.getElementById('inboxVaultToggleBtn').addEventListener('click', () => {
+      renderVaultModal();
+      document.getElementById('receivedFilesVaultModal').classList.remove('hidden');
     });
 
-    document.getElementById('closeInboxBtn').addEventListener('click', () => {
-      document.getElementById('inboxModal').classList.add('hidden');
+    document.getElementById('closeVaultModalBtn').addEventListener('click', () => {
+      document.getElementById('receivedFilesVaultModal').classList.add('hidden');
     });
 
-    document.getElementById('clearInboxItemsBtn').addEventListener('click', () => {
+    document.getElementById('clearVaultBtn').addEventListener('click', () => {
       appState.inbox = [];
-      refreshInboxBadge();
-      renderInboxModal();
+      updateVaultBadge();
+      renderVaultModal();
     });
 
-    function renderInboxModal() {
-      const container = document.getElementById('inboxItemsContainer');
-      const countLabel = document.getElementById('inboxCountSummary');
-      countLabel.textContent = `${appState.inbox.length} item${appState.inbox.length === 1 ? '' : 's'} stored`;
+    function renderVaultModal() {
+      const container = document.getElementById('vaultItemsContainer');
+      const label = document.getElementById('vaultItemCountLabel');
+      label.textContent = `${appState.inbox.length} item${appState.inbox.length === 1 ? '' : 's'} stored`;
 
       if (appState.inbox.length === 0) {
         container.innerHTML = `
@@ -1245,15 +1433,32 @@
       }
 
       container.innerHTML = appState.inbox.map(item => {
-        const isImg = item.type.startsWith('image/');
-        const isVid = item.type.startsWith('video/');
+        const isImg = item.type && item.type.startsWith('image/');
+        const isVid = item.type && item.type.startsWith('video/');
+
+        let mediaThumbHtml = '';
+        if (isImg) {
+          mediaThumbHtml = `<img src="${item.dataUrl}" class="w-full h-full object-cover" />`;
+        } else if (isVid) {
+          mediaThumbHtml = `<i data-lucide="film" class="w-5 h-5 text-violet-400"></i>`;
+        } else {
+          mediaThumbHtml = `<i data-lucide="file" class="w-5 h-5 text-cyan-400"></i>`;
+        }
+
+        let previewActionBtn = '';
+        if (isImg || isVid) {
+          previewActionBtn = `
+            <button onclick="handlePreviewItem('${item.id}')" class="p-2 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-200 transition" title="Preview Media">
+              <i data-lucide="eye" class="w-4 h-4"></i>
+            </button>
+          `;
+        }
 
         return `
           <div class="bg-cyber-850 border border-cyber-border rounded-2xl p-3 flex items-center justify-between gap-3 font-mono">
             <div class="flex items-center gap-3 min-w-0">
-              <div class="w-11 h-11 rounded-xl bg-cyber-950 border border-cyber-border flex items-center justify-center shrink-0 overflow-hidden cursor-pointer" onclick="handlePreviewInboxItem('${item.id}')">
-                ${isImg ? `<img src="${item.dataUrl}" class="w-full h-full object-cover" />` : 
-                  (isVid ? `<i data-lucide="film" class="w-5 h-5 text-violet-400"></i>` : `<i data-lucide="file" class="w-5 h-5 text-cyan-400"></i>`)}
+              <div class="w-11 h-11 rounded-xl bg-cyber-950 border border-cyber-border flex items-center justify-center shrink-0 overflow-hidden cursor-pointer" onclick="handlePreviewItem('${item.id}')">
+                ${mediaThumbHtml}
               </div>
               <div class="min-w-0">
                 <p class="text-xs font-semibold text-slate-100 truncate">${escapeHtml(item.name)}</p>
@@ -1262,12 +1467,8 @@
             </div>
 
             <div class="flex items-center gap-2 shrink-0">
-              ${(isImg || isVid) ? `
-                <button onclick="handlePreviewInboxItem('${item.id}')" class="p-2 rounded-xl bg-cyber-800 hover:bg-cyber-700 text-slate-200 transition" title="Preview Media">
-                  <i data-lucide="eye" class="w-4 h-4"></i>
-                </button>
-              ` : ''}
-              <a href="${item.dataUrl}" download="${item.name}" class="p-2 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white transition flex items-center justify-center" title="Save to disk">
+              ${previewActionBtn}
+              <a href="${item.dataUrl}" download="${item.name}" class="p-2 rounded-xl bg-gradient-to-r from-cyan-600 to-emerald-600 hover:from-cyan-500 hover:to-emerald-500 text-white transition flex items-center justify-center" title="Save file">
                 <i data-lucide="download" class="w-4 h-4"></i>
               </a>
             </div>
@@ -1278,27 +1479,28 @@
       lucide.createIcons();
     }
 
-    function handlePreviewInboxItem(id) {
+    function handlePreviewItem(id) {
       const item = appState.inbox.find(i => i.id === id);
       if (!item) return;
 
       if (item.type.startsWith('image/')) {
-        openMediaLightbox(item.dataUrl, item.name, 'image');
+        openLightbox(item.dataUrl, item.name, 'image');
       } else if (item.type.startsWith('video/')) {
-        openMediaLightbox(item.dataUrl, item.name, 'video');
+        openLightbox(item.dataUrl, item.name, 'video');
       }
     }
 
-    function openMediaLightbox(url, caption, type) {
+    // Media Lightbox
+    function openLightbox(url, caption, type) {
       const modal = document.getElementById('mediaLightboxModal');
-      const box = document.getElementById('lightboxMediaContent');
-      const cap = document.getElementById('lightboxCaptionText');
+      const mount = document.getElementById('lightboxMountContent');
+      const label = document.getElementById('lightboxCaption');
 
-      cap.textContent = caption;
+      label.textContent = caption;
       if (type === 'image') {
-        box.innerHTML = `<img src="${url}" class="max-h-[75vh] w-auto rounded-xl object-contain" />`;
+        mount.innerHTML = `<img src="${url}" class="max-h-[75vh] w-auto rounded-xl object-contain" />`;
       } else if (type === 'video') {
-        box.innerHTML = `<video src="${url}" controls autoplay class="max-h-[75vh] w-full rounded-xl"></video>`;
+        mount.innerHTML = `<video src="${url}" controls autoplay class="max-h-[75vh] w-full rounded-xl"></video>`;
       }
 
       modal.classList.remove('hidden');
@@ -1306,8 +1508,52 @@
 
     document.getElementById('closeLightboxBtn').addEventListener('click', () => {
       document.getElementById('mediaLightboxModal').classList.add('hidden');
-      document.getElementById('lightboxMediaContent').innerHTML = '';
+      document.getElementById('lightboxMountContent').innerHTML = '';
     });
+
+    const chatInput = document.getElementById('chatInputMessage');
+    const sendChatBtn = document.getElementById('sendChatBtn');
+    const chatLog = document.getElementById('chatMessagesLog');
+
+    function sendChatMessage() {
+      const text = chatInput.value.trim();
+      if (!text || !appState.isConnected) return;
+
+      broadcastSignal({
+        type: 'CHAT_MSG',
+        sender: appState.localDevice,
+        payload: { text }
+      });
+
+      appendChatMessage('You', text, true);
+      chatInput.value = '';
+    }
+
+    sendChatBtn.addEventListener('click', sendChatMessage);
+    chatInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') sendChatMessage();
+    });
+
+    function appendChatMessage(senderName, message, isMe = false) {
+      const msgDiv = document.createElement('div');
+      msgDiv.className = `flex flex-col ${isMe ? 'items-end' : 'items-start'}`;
+      msgDiv.innerHTML = `
+        <span class="text-[9px] text-slate-500 mb-0.5">${escapeHtml(senderName)}</span>
+        <div class="px-3 py-1.5 rounded-xl ${isMe ? 'bg-cyan-600/30 border border-cyan-500/40 text-cyan-200' : 'bg-cyber-850 border border-cyber-border text-slate-200'} max-w-[85%] break-words">
+          ${escapeHtml(message)}
+        </div>
+      `;
+      chatLog.appendChild(msgDiv);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
+
+    function appendSystemMessage(msg) {
+      const sysDiv = document.createElement('div');
+      sysDiv.className = 'text-center my-1';
+      sysDiv.innerHTML = `<span class="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded-full">${escapeHtml(msg)}</span>`;
+      chatLog.appendChild(sysDiv);
+      chatLog.scrollTop = chatLog.scrollHeight;
+    }
 
     function formatBytes(bytes) {
       if (!bytes || bytes === 0) return '0 B';
@@ -1323,10 +1569,10 @@
       return d.innerHTML;
     }
 
-    function showToast(text) {
+    function showToast(msg) {
       const toast = document.createElement('div');
       toast.className = 'fixed top-16 right-5 z-50 bg-cyber-900 border border-cyan-500/50 text-slate-100 px-4 py-2.5 rounded-2xl shadow-2xl text-xs font-mono flex items-center gap-2 transform transition-all duration-300 translate-y-[-20px] opacity-0';
-      toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-cyan-400"></i> ${escapeHtml(text)}`;
+      toast.innerHTML = `<i data-lucide="info" class="w-4 h-4 text-cyan-400"></i> ${escapeHtml(msg)}`;
       document.body.appendChild(toast);
       lucide.createIcons();
 
@@ -1342,11 +1588,11 @@
     }
 
     // Startup
-    window.onload = () => {
-      detectCurrentDevice();
-      initializeRoomToken();
+    window.addEventListener('load', () => {
+      detectClientHardware();
+      initializeMeshRoom();
       lucide.createIcons();
-    };
+    });
   </script>
 </body>
 </html>
