@@ -542,7 +542,7 @@
   </div>
 
   <script>
-    // Unified App State
+    // Unified Application State
     const appState = {
       localDevice: {
         id: 'peer_' + Math.random().toString(36).substring(2, 9),
@@ -553,18 +553,23 @@
       roomToken: null,
       channel: null,
       storageListener: null,
+      mqttClient: null,
+      isMqttConnected: false,
+      isHost: false,
       isConnected: false,
       connectedPeer: null,
+      pendingGuestPairRequest: null,
       stagedFiles: [],
       inbox: [],
       pendingOffer: null,
       cameraStream: null,
       cameraFacingMode: 'environment',
       isScanning: false,
-      pingInterval: null
+      pingInterval: null,
+      activeTransfers: {}
     };
 
-    // Synthetic notification tones using AudioContext
+    // Sound FX synthesizer
     function playAudioChime(type) {
       type = type || 'success';
       try {
@@ -577,7 +582,6 @@
         gain.connect(audioCtx.destination);
 
         if (type === 'scan') {
-          // Double chirp for QR recognition
           osc.type = 'sine';
           osc.frequency.setValueAtTime(880, audioCtx.currentTime);
           osc.frequency.exponentialRampToValueAtTime(1760, audioCtx.currentTime + 0.12);
@@ -585,8 +589,16 @@
           gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.12);
           osc.start();
           osc.stop(audioCtx.currentTime + 0.12);
+        } else if (type === 'ring') {
+          // Double chime for incoming pair request
+          osc.type = 'triangle';
+          osc.frequency.setValueAtTime(587.33, audioCtx.currentTime); // D5
+          osc.frequency.setValueAtTime(880.00, audioCtx.currentTime + 0.12); // A5
+          gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.35);
+          osc.start();
+          osc.stop(audioCtx.currentTime + 0.35);
         } else if (type === 'connected') {
-          // Harmonic chime for pairing established
           osc.type = 'triangle';
           osc.frequency.setValueAtTime(523.25, audioCtx.currentTime); // C5
           osc.frequency.setValueAtTime(659.25, audioCtx.currentTime + 0.08); // E5
@@ -606,6 +618,7 @@
       } catch (e) {}
     }
 
+    // Hardware and OS fingerprinting
     function detectClientHardware() {
       const ua = navigator.userAgent;
       const width = window.innerWidth;
@@ -620,7 +633,7 @@
         category = 'tablet';
         name = /iPad/i.test(ua) ? 'Apple iPad Pro' : 'Android Tablet';
         icon = 'tablet';
-      } else if (/iPhone|iPod/i.test(ua)) {
+      } else if (/iPhone/i.test(ua)) {
         category = 'phone';
         name = 'Apple iPhone';
         icon = 'smartphone';
@@ -633,7 +646,7 @@
         name = 'Mobile Device';
         icon = 'smartphone';
       } else if (/Macintosh/i.test(ua)) {
-        name = 'Apple MacBook Pro';
+        name = 'Apple MacBook';
       } else if (/Windows/i.test(ua)) {
         name = 'Windows PC';
       } else if (/Linux/i.test(ua)) {
@@ -649,49 +662,43 @@
       lucide.createIcons();
     }
 
+    // Initialize Room & Universal Signaling Client
     function initializeMeshRoom() {
-      // 1. Check URL query or Hash (e.g. ?room=MESH-1234 or #room=MESH-1234)
       const urlParams = new URLSearchParams(window.location.search);
       const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''));
       const roomParam = urlParams.get('room') || hashParams.get('room');
 
       if (roomParam) {
         appState.roomToken = roomParam.trim().toUpperCase();
+        appState.isHost = false; // Loaded existing room via scan or link
       } else {
         appState.roomToken = 'MESH-' + Math.floor(1000 + Math.random() * 9000);
+        appState.isHost = true; // Created new room
       }
 
-      // Update UI elements
       document.getElementById('activeHostRoomLabel').textContent = `ROOM: ${appState.roomToken}`;
       renderHostQrCode();
-      setupDualChannelSync();
+      setupUniversalSignaling();
 
-      // Broadcast an initial handshake SYN
-      broadcastSignal({
-        type: 'PEER_SYN',
-        sender: appState.localDevice,
-        roomToken: appState.roomToken,
-        timestamp: Date.now()
-      });
+      // If guest opened via direct URL with room token, auto-dispatch PAIR_REQUEST
+      if (!appState.isHost) {
+        showGuestWaitingBanner(`Connecting to Room ${appState.roomToken}...`);
+        setTimeout(() => {
+          sendPairRequestToHost();
+        }, 1200);
+      }
     }
 
-    // Set up BroadcastChannel with localStorage cross-tab fallback
-    function setupDualChannelSync() {
-      if (appState.channel) {
-        try { appState.channel.close(); } catch (e) {}
-      }
-
-      const channelName = `qrdrop_mesh_${appState.roomToken}`;
-
-      // 1. Primary: BroadcastChannel
+    // Universal Signaling Engine (MQTT WebSockets + BroadcastChannel fallback)
+    function setupUniversalSignaling() {
+      // 1. Same-device multi-tab channel
       try {
-        appState.channel = new BroadcastChannel(channelName);
+        if (appState.channel) appState.channel.close();
+        appState.channel = new BroadcastChannel(`qrdrop_${appState.roomToken}`);
         appState.channel.onmessage = (e) => processIncomingSignal(e.data);
-      } catch (err) {
-        console.warn('BroadcastChannel unavailable, relying on localStorage fallback', err);
-      }
+      } catch (err) {}
 
-      // 2. Secondary: localStorage cross-window event synchronization
+      // 2. Storage event listener fallback
       if (!appState.storageListener) {
         appState.storageListener = (e) => {
           if (e.key && e.key.startsWith(`qrdrop_event_${appState.roomToken}`)) {
@@ -705,24 +712,79 @@
         };
         window.addEventListener('storage', appState.storageListener);
       }
+
+      // 3. Cloud WebSocket Broker (EMQX / HiveMQ public cluster)
+      connectMqttBroker();
     }
 
-    // Robust Signal Dispatcher
+    function connectMqttBroker() {
+      if (typeof mqtt === 'undefined') return;
+
+      const brokerList = [
+        'wss://broker.emqx.io:8084/mqtt',
+        'wss://broker.hivemq.com:8884/mqtt'
+      ];
+      const brokerUrl = brokerList[0];
+      const clientId = `qrdrop_${appState.localDevice.id}_${Math.random().toString(16).substring(2, 6)}`;
+
+      try {
+        const client = mqtt.connect(brokerUrl, {
+          clientId: clientId,
+          clean: true,
+          connectTimeout: 6000,
+          reconnectPeriod: 3000
+        });
+
+        appState.mqttClient = client;
+
+        client.on('connect', () => {
+          appState.isMqttConnected = true;
+          // Subscribe to topic for this room
+          const topic = `qrdrop/mesh/${appState.roomToken}/#`;
+          client.subscribe(topic, { qos: 1 });
+        });
+
+        client.on('message', (topic, message) => {
+          try {
+            const packet = JSON.parse(message.toString());
+            processIncomingSignal(packet);
+          } catch (e) {}
+        });
+
+        client.on('error', () => {
+          appState.isMqttConnected = false;
+        });
+      } catch (e) {
+        console.warn('MQTT signaling init error:', e);
+      }
+    }
+
+    // Unified Packet Dispatcher
     function broadcastSignal(packet) {
-      // Send via BroadcastChannel
+      if (!packet.sender) packet.sender = appState.localDevice;
+      if (!packet.roomToken) packet.roomToken = appState.roomToken;
+      packet.timestamp = Date.now();
+
+      // 1. BroadcastChannel (Same machine)
       if (appState.channel) {
-        try {
-          appState.channel.postMessage(packet);
-        } catch (e) {}
+        try { appState.channel.postMessage(packet); } catch (e) {}
       }
 
-      // Send via localStorage event (fires in all other tabs/windows on the origin)
+      // 2. LocalStorage (Same machine)
       try {
-        const eventKey = `qrdrop_event_${appState.roomToken}`;
-        localStorage.setItem(eventKey, JSON.stringify(packet));
+        localStorage.setItem(`qrdrop_event_${appState.roomToken}`, JSON.stringify(packet));
       } catch (e) {}
+
+      // 3. MQTT over WebSocket (Cross-device physical phone/tablet/PC)
+      if (appState.mqttClient && appState.isMqttConnected) {
+        try {
+          const topic = `qrdrop/mesh/${appState.roomToken}/signals`;
+          appState.mqttClient.publish(topic, JSON.stringify(packet), { qos: 1 });
+        } catch (e) {}
+      }
     }
 
+    // Incoming Packet Switchboard
     function processIncomingSignal(packet) {
       if (!packet || !packet.sender || packet.sender.id === appState.localDevice.id) {
         return; // Ignore own echoes
@@ -731,37 +793,45 @@
       const { type, sender, targetId, payload } = packet;
 
       switch (type) {
-        case 'PEER_SYN':
-          // Another device has arrived or scanned the QR code
-          // Immediately respond with PEER_ACK and announce readiness
-          broadcastSignal({
-            type: 'PEER_ACK',
-            sender: appState.localDevice,
-            targetId: sender.id,
-            roomToken: appState.roomToken
-          });
-
-          if (!appState.isConnected) {
-            completeConnection(sender);
+        case 'PAIR_REQUEST':
+          // Host receives scan request from Guest!
+          if (appState.isHost || !appState.isConnected) {
+            handleIncomingPairRequest(sender);
           }
           break;
 
-        case 'PEER_ACK':
-          // Handshake acknowledged
-          if (!appState.isConnected) {
+        case 'PAIR_ACCEPTED':
+          // Guest receives authorization from Host!
+          if (!appState.isConnected && (targetId === appState.localDevice.id || !targetId)) {
+            hideGuestWaitingBanner();
             completeConnection(sender);
-            // Confirm final ESTABLISHED state
+            showToast(`Paired with ${sender.name}! Two-way link established.`);
+          }
+          break;
+
+        case 'PAIR_DECLINED':
+          // Guest was declined by Host
+          if (targetId === appState.localDevice.id) {
+            hideGuestWaitingBanner();
+            showToast('Host declined the connection request.');
+          }
+          break;
+
+        case 'PING_PING':
+          if (targetId === appState.localDevice.id) {
             broadcastSignal({
-              type: 'PEER_ESTABLISHED',
+              type: 'PING_PONG',
               sender: appState.localDevice,
-              targetId: sender.id
+              targetId: sender.id,
+              payload: { sentTime: payload.sentTime }
             });
           }
           break;
 
-        case 'PEER_ESTABLISHED':
-          if (!appState.isConnected) {
-            completeConnection(sender);
+        case 'PING_PONG':
+          if (targetId === appState.localDevice.id && payload && payload.sentTime) {
+            const rtt = Math.max(0.5, (performance.now() - payload.sentTime)).toFixed(1);
+            document.getElementById('pairedPeerPing').textContent = `${rtt} ms ping`;
           }
           break;
 
@@ -772,44 +842,128 @@
           }
           break;
 
-        case 'PING_PING':
-          if (targetId === appState.localDevice.id) {
-            broadcastSignal({
-              type: 'PING_PONG',
-              sender: appState.localDevice,
-              targetId: sender.id,
-              sentTime: payload.sentTime
-            });
-          }
-          break;
-
-        case 'PING_PONG':
-          if (targetId === appState.localDevice.id) {
-            const rtt = (performance.now() - payload.sentTime).toFixed(1);
-            document.getElementById('pairedPeerPing').textContent = `${rtt} ms ping`;
-            showToast(`Ping response from ${sender.name}: ${rtt} ms`);
-          }
-          break;
-
         case 'FILE_OFFER':
           if (appState.isConnected) {
             receiveFileOffer(payload, sender);
           }
           break;
 
+        case 'FILE_CHUNK':
+          if (appState.isConnected) {
+            handleIncomingFileChunk(payload);
+          }
+          break;
+
         case 'PEER_DISCONNECT':
           disconnectPeer(false);
-          showToast(`${sender.name} disconnected`);
+          showToast(`${sender.name} disconnected.`);
           break;
       }
     }
 
-    // Finalize Connection and Update UI
+    // Host receives PAIR_REQUEST modal
+    function handleIncomingPairRequest(guestDevice) {
+      appState.pendingGuestPairRequest = guestDevice;
+
+      const nameEl = document.getElementById('approvalGuestDeviceName');
+      const catEl = document.getElementById('approvalGuestCategory');
+      const roomEl = document.getElementById('approvalRoomTag');
+      const iconEl = document.getElementById('approvalGuestIcon');
+      const typeIconEl = document.getElementById('approvalGuestDeviceTypeIcon');
+
+      if (nameEl) nameEl.textContent = guestDevice.name;
+      if (catEl) catEl.textContent = (guestDevice.category || 'DEVICE').toUpperCase();
+      if (roomEl) roomEl.textContent = `ROOM: ${appState.roomToken}`;
+
+      const iconName = guestDevice.icon || (guestDevice.category === 'phone' ? 'smartphone' : 'laptop');
+      if (iconEl) iconEl.innerHTML = `<i data-lucide="${iconName}" class="w-8 h-8"></i>`;
+      if (typeIconEl) typeIconEl.setAttribute('data-lucide', iconName);
+      if (window.lucide) lucide.createIcons();
+
+      // Show host approval modal & play ring
+      const modal = document.getElementById('hostPairApprovalModal');
+      if (modal) modal.classList.remove('hidden');
+      playAudioChime('ring');
+    }
+
+    // Host Clicks Accept
+    const acceptPairBtn = document.getElementById('acceptPairBtn');
+    if (acceptPairBtn) {
+      acceptPairBtn.addEventListener('click', () => {
+        const guest = appState.pendingGuestPairRequest;
+        const modal = document.getElementById('hostPairApprovalModal');
+        if (modal) modal.classList.add('hidden');
+        if (!guest) return;
+
+        // Broadcast acceptance back to guest
+        broadcastSignal({
+          type: 'PAIR_ACCEPTED',
+          sender: appState.localDevice,
+          targetId: guest.id,
+          roomToken: appState.roomToken
+        });
+
+        completeConnection(guest);
+        appState.pendingGuestPairRequest = null;
+      });
+    }
+
+    // Host Clicks Decline
+    const declinePairBtn = document.getElementById('declinePairBtn');
+    if (declinePairBtn) {
+      declinePairBtn.addEventListener('click', () => {
+        const guest = appState.pendingGuestPairRequest;
+        const modal = document.getElementById('hostPairApprovalModal');
+        if (modal) modal.classList.add('hidden');
+        if (!guest) return;
+
+        broadcastSignal({
+          type: 'PAIR_DECLINED',
+          sender: appState.localDevice,
+          targetId: guest.id,
+          roomToken: appState.roomToken
+        });
+
+        appState.pendingGuestPairRequest = null;
+        showToast('Connection declined.');
+      });
+    }
+
+    // Guest sends PAIR_REQUEST to Host
+    function sendPairRequestToHost() {
+      broadcastSignal({
+        type: 'PAIR_REQUEST',
+        sender: appState.localDevice,
+        roomToken: appState.roomToken
+      });
+    }
+
+    function showGuestWaitingBanner(text) {
+      const label = document.getElementById('guestWaitingHostText');
+      if (label) label.textContent = text || 'Pairing with Host...';
+      const modal = document.getElementById('guestWaitingApprovalModal');
+      if (modal) modal.classList.remove('hidden');
+    }
+
+    function hideGuestWaitingBanner() {
+      const modal = document.getElementById('guestWaitingApprovalModal');
+      if (modal) modal.classList.add('hidden');
+    }
+
+    const cancelGuestWaitingBtn = document.getElementById('cancelGuestWaitingBtn');
+    if (cancelGuestWaitingBtn) {
+      cancelGuestWaitingBtn.addEventListener('click', () => {
+        hideGuestWaitingBanner();
+        showToast('Pairing request cancelled.');
+      });
+    }
+
+    // Connection Established State
     function completeConnection(peerDevice) {
       appState.isConnected = true;
       appState.connectedPeer = peerDevice;
 
-      // Update Nav Indicator
+      // Update Header Indicator
       const dot = document.getElementById('navConnDot');
       dot.innerHTML = `
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
@@ -830,22 +984,23 @@
       document.getElementById('pairedPeerIcon').innerHTML = `<i data-lucide="${peerDevice.icon || 'smartphone'}" class="w-7 h-7"></i>`;
       document.getElementById('sendPayloadLabel').textContent = `Transmit to ${peerDevice.name}`;
 
-      // Enable Chat input
+      // Enable Chat & File Sharing Controls
       document.getElementById('chatInputMessage').disabled = false;
       document.getElementById('sendChatBtn').disabled = false;
+      document.getElementById('sendPayloadBtn').disabled = appState.stagedFiles.length === 0;
 
-      // Close open scanner and host modals
-      closeScannerModal();
+      // Close open modals
+      closeCameraScanner();
       document.getElementById('hostQrModal').classList.add('hidden');
+      hideGuestWaitingBanner();
+      document.getElementById('hostPairApprovalModal').classList.add('hidden');
 
       lucide.createIcons();
       playAudioChime('connected');
-      showToast(`Connected with ${peerDevice.name}! Both devices can now share data.`);
 
-      // Log to chat
-      appendSystemMessage(`Connected with ${peerDevice.name}. Two-way data pipe is open!`);
+      appendSystemMessage(`Linked with ${peerDevice.name}. Two-way data pipe is open!`);
 
-      // Start periodic ping
+      // Start ping loop
       if (appState.pingInterval) clearInterval(appState.pingInterval);
       appState.pingInterval = setInterval(() => {
         if (appState.isConnected && appState.connectedPeer) {
@@ -856,15 +1011,15 @@
             payload: { sentTime: performance.now() }
           });
         }
-      }, 5000);
+      }, 4000);
     }
 
-    // Disconnect Logic
     function disconnectPeer(notify = true) {
-      if (notify && appState.isConnected) {
+      if (notify && appState.isConnected && appState.connectedPeer) {
         broadcastSignal({
           type: 'PEER_DISCONNECT',
           sender: appState.localDevice,
+          targetId: appState.connectedPeer.id,
           roomToken: appState.roomToken
         });
       }
@@ -877,7 +1032,6 @@
       appState.isConnected = false;
       appState.connectedPeer = null;
 
-      // Reset Header
       const dot = document.getElementById('navConnDot');
       dot.innerHTML = `
         <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-slate-500 opacity-60"></span>
@@ -887,12 +1041,10 @@
       navStatus.textContent = 'Waiting for QR Scan';
       navStatus.classList.replace('text-emerald-400', 'text-amber-400');
 
-      // Reset HUDs
       document.getElementById('unconnectedHeroBanner').classList.remove('hidden');
       document.getElementById('liveConnectedHud').classList.add('hidden');
       document.getElementById('sendPayloadLabel').textContent = 'Transmit to Paired Peer';
 
-      // Disable chat
       document.getElementById('chatInputMessage').disabled = true;
       document.getElementById('sendChatBtn').disabled = true;
 
@@ -912,9 +1064,11 @@
       }
     });
 
+    // Render Host QR Code
     function renderHostQrCode() {
-      // Craft the canonical pairing URL embedding the room token in the hash
-      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('#')[0].split('?')[0];
+      const origin = (window.location.origin && window.location.origin !== 'null') 
+        ? window.location.origin 
+        : window.location.href.split('#')[0].split('?')[0];
       const shareUrl = `${origin}#room=${appState.roomToken}`;
 
       document.getElementById('hostShareUrlInput').value = shareUrl;
@@ -950,12 +1104,14 @@
       const input = document.getElementById('hostShareUrlInput');
       input.select();
       document.execCommand('copy');
-      showToast('Copied direct pairing URL to clipboard!');
+      showToast('Copied pairing URL to clipboard!');
     });
 
     // 1-Click Launch Second Tab to Test
     function openPairedTab() {
-      const origin = window.location.origin && window.location.origin !== 'null' ? window.location.origin : window.location.href.split('#')[0];
+      const origin = (window.location.origin && window.location.origin !== 'null') 
+        ? window.location.origin 
+        : window.location.href.split('#')[0];
       const targetUrl = `${origin}#room=${appState.roomToken}`;
       window.open(targetUrl, '_blank');
       showToast('Opened companion tab. Both tabs will auto-pair!');
@@ -972,10 +1128,10 @@
         category: 'phone',
         icon: 'smartphone'
       };
-
-      completeConnection(mockPhone);
+      handleIncomingPairRequest(mockPhone);
     });
 
+    // Camera QR Scanner Implementation
     const scannerModal = document.getElementById('scannerModal');
     const videoEl = document.getElementById('cameraScannerVideo');
     const analysisCanvas = document.getElementById('cameraAnalysisCanvas');
@@ -1010,7 +1166,6 @@
         await videoEl.play();
         requestAnimationFrame(tickQrAnalysis);
       } catch (err) {
-        console.warn('Camera stream error:', err);
         showCameraPrompt('Camera Permission Blocked', 'Allow camera access in your browser or select an image containing the QR code.');
       }
     }
@@ -1038,7 +1193,6 @@
       openCameraScanner();
     });
 
-    // Continuous Frame Loop
     function tickQrAnalysis() {
       if (!appState.isScanning) return;
 
@@ -1063,7 +1217,7 @@
       requestAnimationFrame(tickQrAnalysis);
     }
 
-    // File Image Reader Fallback
+    // Image file scan fallback
     function setupImageScanner(inputEl) {
       inputEl.addEventListener('change', (e) => {
         const file = e.target.files[0];
@@ -1102,6 +1256,7 @@
       handleScannedPayload(val);
     });
 
+    // Scanned Payload Processing
     function handleScannedPayload(rawString) {
       playAudioChime('scan');
       if (navigator.vibrate) {
@@ -1125,37 +1280,27 @@
 
       if (parsedRoom) {
         appState.roomToken = parsedRoom.toUpperCase();
+        appState.isHost = false; // We are guest pairing into host's room
         window.location.hash = `room=${appState.roomToken}`;
-        
-        // Re-bind dual sync channel & WebRTC peer to target room
-        setupDualChannelSync();
-        renderHostQrCode();
+
         closeCameraScanner();
+        setupUniversalSignaling();
 
-        // Connect as guest to host peer
-        const hostPeerId = `qrdrop-host-${appState.roomToken.toLowerCase()}`;
-        initializeWebRtcPeer(true);
-        connectToHostPeer(hostPeerId);
+        // Show guest waiting screen immediately
+        showGuestWaitingBanner(`Requesting connection with Host (${appState.roomToken})...`);
 
-        // Show waiting banner on this guest device
-        document.getElementById('guestWaitingApprovalModal').classList.remove('hidden');
-        lucide.createIcons();
+        // Send PAIR_REQUEST to host
+        setTimeout(() => {
+          sendPairRequestToHost();
+        }, 500);
 
-        showToast(`QR Scanned! Sent pairing request to Host (${appState.roomToken})`);
-
-        // Broadcast pair request across local channel as well
-        broadcastSignal({
-          type: 'PAIR_REQUEST',
-          sender: appState.localDevice,
-          roomToken: appState.roomToken,
-          timestamp: Date.now()
-        });
-
+        showToast(`QR Code Scanned! Sent connection request to Host (${appState.roomToken}).`);
       } else {
         showToast('Invalid QR Code format.');
       }
     }
 
+    // Media & File Staging System
     const filePicker = document.getElementById('filePickerInput');
     const dropZone = document.getElementById('dropZoneBox');
     const stagedContainer = document.getElementById('stagedFilesContainer');
@@ -1223,7 +1368,7 @@
     function renderStagedList() {
       const count = appState.stagedFiles.length;
       stagedCountBadge.textContent = `${count} file${count === 1 ? '' : 's'} staged`;
-      sendPayloadBtn.disabled = count === 0;
+      sendPayloadBtn.disabled = count === 0 || !appState.isConnected;
 
       if (count === 0) {
         stagedContainer.innerHTML = `
@@ -1263,6 +1408,7 @@
       lucide.createIcons();
     }
 
+    // High Speed File Transmission
     sendPayloadBtn.addEventListener('click', async () => {
       if (!appState.isConnected || !appState.connectedPeer) {
         showToast('Please pair with a peer device first!');
@@ -1271,19 +1417,20 @@
       if (appState.stagedFiles.length === 0) return;
 
       const staged = appState.stagedFiles[0];
+      const transferId = 'tx_' + Math.random().toString(36).substring(2, 9);
       let dataUrl = null;
 
-      // Read small/medium files into DataURL for real inter-tab transfer
-      if (staged.file.size < 40 * 1024 * 1024) {
+      if (staged.file.size < 45 * 1024 * 1024) {
         dataUrl = await readFileDataUrl(staged.file);
       }
 
-      // Broadcast file offer
+      // 1. Broadcast Offer
       broadcastSignal({
         type: 'FILE_OFFER',
         sender: appState.localDevice,
         targetId: appState.connectedPeer.id,
         payload: {
+          transferId: transferId,
           name: staged.name,
           size: staged.size,
           type: staged.type,
@@ -1291,7 +1438,7 @@
         }
       });
 
-      // Launch Transfer HUD
+      // 2. Launch Local Transfer HUD
       const hud = document.getElementById('transferProgressHUD');
       const nameLabel = document.getElementById('transferItemName');
       const barFill = document.getElementById('transferProgressBarFill');
@@ -1311,7 +1458,7 @@
       const streamTimer = setInterval(() => {
         transmitted += step;
         const progress = Math.min(100, Math.round((transmitted / total) * 100));
-        const rate = (38 + Math.random() * 12).toFixed(1);
+        const rate = (36 + Math.random() * 14).toFixed(1);
         const eta = Math.max(0, Math.ceil((total - transmitted) / (parseFloat(rate) * 1024 * 1024)));
 
         barFill.style.width = progress + '%';
@@ -1342,6 +1489,7 @@
       });
     }
 
+    // Receive File Offer Dialog
     function receiveFileOffer(fileOffer, senderDevice) {
       appState.pendingOffer = { fileOffer, senderDevice };
 
@@ -1390,7 +1538,7 @@
       appState.inbox.unshift(receivedItem);
       updateVaultBadge();
       showToast(`Saved "${fileOffer.name}" to Vault!`);
-      playAudioChime('success');
+      playAudioChime('connected');
     });
 
     function createDummyBlobUrl(name, type) {
@@ -1498,7 +1646,6 @@
       }
     }
 
-    // Media Lightbox
     function openLightbox(url, caption, type) {
       const modal = document.getElementById('mediaLightboxModal');
       const mount = document.getElementById('lightboxMountContent');
@@ -1519,6 +1666,7 @@
       document.getElementById('lightboxMountContent').innerHTML = '';
     });
 
+    // Mesh Chat System
     const chatInput = document.getElementById('chatInputMessage');
     const sendChatBtn = document.getElementById('sendChatBtn');
     const chatLog = document.getElementById('chatMessagesLog');
@@ -1595,7 +1743,7 @@
       }, 3500);
     }
 
-    // Startup
+    // Startup on window load
     window.addEventListener('load', () => {
       detectClientHardware();
       initializeMeshRoom();
